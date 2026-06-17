@@ -1,0 +1,25 @@
+{
+  "name": "i-am-boss",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json",
+    "build:web": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
+    "harness": "tsx src/harness/run.ts",
+    "balance": "tsx src/harness/balance.ts",
+    "probability:audit": "tsx src/harness/probability-audit.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^22.13.14",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vite": "^7.3.5",
+    "vitest": "^3.0.9"
+  }
+}

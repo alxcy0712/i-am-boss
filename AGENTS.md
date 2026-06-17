@@ -1,0 +1,51 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+This repository builds “我是老板 / I am boss,” a 2D pixel business simulation. Keep simulation logic render-independent.
+
+```text
+src/config/        initial choices, probability tables, balance constants
+src/sim/           pure systems for company, employees, finance, society, scoring
+src/harness/       seeded runners, snapshots, fast-forward, balance reports
+src/game/          render-agnostic session controller and player actions
+src/ui/            HUD and city-map view models
+src/web/           Vite browser client for the playable prototype
+tests/             Vitest tests covering systems and harness behavior
+assets/            planned pixel art, audio, fonts, and fixtures
+docs/              planned design notes, economy model, and UI decisions
+```
+
+`src/config/probabilities.ts` is the source of truth for chance-based behavior. Add tunables there with gameplay-impact comments.
+
+## Build, Test, and Development Commands
+
+- `npm install` installs TypeScript, Vitest, Vite, Playwright, and tsx. Use `NPM_CONFIG_CACHE=/tmp/i-am-boss-npm-cache npm install` for npm cache permission issues.
+- `npm run build` type-checks with `tsc -p tsconfig.json`.
+- `npm run build:web` creates the Vite build.
+- `npm run dev` starts the browser prototype on `127.0.0.1`.
+- `npm test` runs all deterministic Vitest unit tests.
+- `npm run test:e2e` runs Playwright core web flow coverage.
+- `npm run harness -- --seed 1 --days 365` prints one seeded summary JSON.
+- `npm run harness -- --seed 7 --days 200 --checkpointIntervalDays 90` records timeline checkpoints.
+- `npm run balance -- --seedStart 1 --runs 10 --days 365 --checkpointIntervalDays 90` runs multi-seed economy reports.
+
+## Coding Style & Naming Conventions
+
+Use TypeScript with 2-space indentation. Prefer pure functions in `src/sim/` and UI state mapping in `src/ui/`. Use `camelCase` for variables/functions, `PascalCase` for classes/scenes, `SCREAMING_SNAKE_CASE` for constants, and `kebab-case` for config filenames.
+
+Browser UI text must support Simplified Chinese and English switching. Add user-facing strings to `src/web/i18n.ts`, keep stable IDs in models, and cover language-specific labels in tests.
+
+## Testing Guidelines
+
+Test files use `*.test.ts` and deterministic seeded RNG. Cover probability changes across hiring, finance, policy, legal, labor, lifecycle, snapshot, and scoring systems.
+
+Use focused tests before full runs. For harness changes, include seed examples and verify deterministic checkpoint summaries.
+
+## Commit & Pull Request Guidelines
+
+History uses short subjects such as `init project`; keep commits imperative, for example `add hiring balance tests`. PRs should include gameplay impact, validation commands, seed examples, UI screenshots or clips, and linked issues.
+
+## Content & Safety
+
+Keep illegal or harmful company and employee behavior abstract, consequence-driven, and non-graphic. Exclude sexual, pornographic, and exploitative content from gameplay, assets, fixtures, and tests.
