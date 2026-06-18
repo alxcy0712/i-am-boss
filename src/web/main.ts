@@ -24,6 +24,7 @@ let showLeaderboard = false;
 let currentLeaderboardId: string | undefined;
 const root = getAppRoot();
 
+root.addEventListener("click", handleRootClick);
 render();
 
 function render(): void {
@@ -127,73 +128,80 @@ function render(): void {
       </section>
     </main>
   `;
+}
 
-  root.querySelectorAll<HTMLButtonElement>("[data-language-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      language = resolveWebLanguage(button.dataset.languageId);
-      storeLanguage(language);
-      render();
-    });
-  });
+function handleRootClick(event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
 
-  root.querySelectorAll<HTMLButtonElement>("[data-event-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const nextFilter = readEventCategoryFilter(button.dataset.eventFilter);
-      if (nextFilter) {
-        eventCategoryFilter = nextFilter;
-        render();
-      }
-    });
-  });
+  const button = target.closest("button");
+  if (!(button instanceof HTMLButtonElement) || !root.contains(button) || button.disabled) {
+    return;
+  }
 
-  root.querySelectorAll<HTMLButtonElement>("[data-choice-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const choiceId = button.dataset.choiceId;
-      if (choiceId) {
-        session = selectInitialChoice(session, choiceId);
-        render();
-      }
-    });
-  });
+  const languageId = button.dataset.languageId;
+  if (languageId) {
+    language = resolveWebLanguage(languageId);
+    storeLanguage(language);
+    render();
+    return;
+  }
 
-  root.querySelectorAll<HTMLButtonElement>("[data-action-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const actionId = button.dataset.actionId;
-      if (actionId === "play-again") {
-        session = createGameSession({ seed: Date.now() });
-        showLeaderboard = false;
-        currentLeaderboardId = undefined;
-        render();
-        return;
-      }
-      if (actionId === "view-leaderboard") {
-        showLeaderboard = true;
-        render();
-        return;
-      }
-      if (actionId === "back-to-game-over") {
-        showLeaderboard = false;
-        render();
-        return;
-      }
-      if (actionId) {
-        session = performSessionAction(session, createActionRequest(actionId, button)).session;
-        if (session.gameOverReason && !currentLeaderboardId) {
-          const summary = session.summary;
-          if (summary) {
-            const entry = addToLeaderboard({
-              daysPlayed: summary.daysPlayed,
-              companyValuation: summary.companyValuation,
-              playerWealth: summary.playerWealth,
-              gameOverReason: session.gameOverReason,
-            });
-            currentLeaderboardId = entry.id;
-          }
-        }
-        render();
-      }
-    });
-  });
+  const nextFilter = readEventCategoryFilter(button.dataset.eventFilter);
+  if (nextFilter) {
+    eventCategoryFilter = nextFilter;
+    render();
+    return;
+  }
+
+  const choiceId = button.dataset.choiceId;
+  if (choiceId) {
+    session = selectInitialChoice(session, choiceId);
+    render();
+    return;
+  }
+
+  const actionId = button.dataset.actionId;
+  if (!actionId) {
+    return;
+  }
+
+  if (actionId === "play-again") {
+    session = createGameSession({ seed: Date.now() });
+    showLeaderboard = false;
+    currentLeaderboardId = undefined;
+    render();
+    return;
+  }
+
+  if (actionId === "view-leaderboard") {
+    showLeaderboard = true;
+    render();
+    return;
+  }
+
+  if (actionId === "back-to-game-over") {
+    showLeaderboard = false;
+    render();
+    return;
+  }
+
+  session = performSessionAction(session, createActionRequest(actionId, button)).session;
+  if (session.gameOverReason && !currentLeaderboardId) {
+    const summary = session.summary;
+    if (summary) {
+      const entry = addToLeaderboard({
+        daysPlayed: summary.daysPlayed,
+        companyValuation: summary.companyValuation,
+        playerWealth: summary.playerWealth,
+        gameOverReason: session.gameOverReason,
+      });
+      currentLeaderboardId = entry.id;
+    }
+  }
+  render();
 }
 
 function renderFounderPanel(

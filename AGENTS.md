@@ -7,16 +7,17 @@ This repository builds “我是老板 / I am boss,” a 2D pixel business simul
 ```text
 src/config/        initial choices, probability tables, balance constants
 src/sim/           pure systems for company, employees, finance, society, scoring
-src/harness/       seeded runners, snapshots, fast-forward, balance reports
+src/harness/       seeded runners, snapshots, fast-forward, balance reports, probability audits
 src/game/          render-agnostic session controller and player actions
 src/ui/            HUD and city-map view models
 src/web/           Vite browser client for the playable prototype
 tests/             Vitest tests covering systems and harness behavior
 assets/            planned pixel art, audio, fonts, and fixtures
-docs/              planned design notes, economy model, and UI decisions
+docs/              economy model, AI iteration guide, UI drafts, and design notes
 ```
 
 `src/config/probabilities.ts` is the source of truth for chance-based behavior. Add tunables there with gameplay-impact comments.
+Use `docs/ai-iteration-guide.md` as the handoff document for future AI iterations, and use `docs/ui-drafts.md` for the current pixel UI direction.
 
 ## Build, Test, and Development Commands
 
@@ -29,12 +30,26 @@ docs/              planned design notes, economy model, and UI decisions
 - `npm run harness -- --seed 1 --days 365` prints one seeded summary JSON.
 - `npm run harness -- --seed 7 --days 200 --checkpointIntervalDays 90` records timeline checkpoints.
 - `npm run balance -- --seedStart 1 --runs 10 --days 365 --checkpointIntervalDays 90` runs multi-seed economy reports.
+- `npm run probability:audit` verifies probability configuration coverage.
+
+## Harness & Balance Workflow
+
+Harness output is the canonical contract for automated balancing and UI model work. Keep `HarnessSummary` deterministic for identical seed, initial choice, and day-count inputs.
+
+When changing simulation behavior:
+- Add or update focused Vitest coverage for the changed system.
+- Run at least one deterministic seed example with `npm run harness -- --seed <n> --days <d>`.
+- For economy changes, run `npm run balance -- --seedStart 1 --runs 10 --days 365 --checkpointIntervalDays 90`.
+- For probability changes, keep the tunable in `src/config/probabilities.ts` with a gameplay-impact comment and run `npm run probability:audit`.
+- Preserve checkpoint determinism for `runHarnessTimeline`.
 
 ## Coding Style & Naming Conventions
 
 Use TypeScript with 2-space indentation. Prefer pure functions in `src/sim/` and UI state mapping in `src/ui/`. Use `camelCase` for variables/functions, `PascalCase` for classes/scenes, `SCREAMING_SNAKE_CASE` for constants, and `kebab-case` for config filenames.
 
 Browser UI text must support Simplified Chinese and English switching. Add user-facing strings to `src/web/i18n.ts`, keep stable IDs in models, and cover language-specific labels in tests.
+
+For web performance, keep simulation work out of render functions. Prefer derived view models, bounded event feeds, event delegation, and single-pass transforms for repeated summaries.
 
 ## Testing Guidelines
 

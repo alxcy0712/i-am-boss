@@ -497,9 +497,13 @@ function createEventFilterOptions(
   selectedFilter: WebEventCategoryFilter,
   language: WebLanguage,
 ): WebEventFilterOption[] {
+  const counts = new Map<GameEventCategory, number>();
+  for (const item of eventItems) {
+    counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+  }
   const categoryCounts = EVENT_CATEGORY_ORDER.map((category) => ({
     category,
-    count: eventItems.filter((item) => item.category === category).length,
+    count: counts.get(category) ?? 0,
   })).filter((entry) => entry.count > 0);
 
   return [
@@ -615,21 +619,25 @@ function createStaffPanel(
         share,
       };
     }),
-    employeeRows: viewModel.staff.employees.map((employee) => ({
-      id: employee.id,
-      role: translateRole(employee.role, language),
-      salary: formatCurrency(employee.salary),
-      targetSalary: formatCurrency(employee.targetSalary),
-      personality: translatePersonality(employee.personality, language),
-      tenure: formatTenureMonths(employee.monthsTenure, language),
-      managementLevel: translateManagementLevel(employee.managementLevel, language),
-      resignationRisk: formatPercent(employee.resignationRisk),
-      resignationRiskLevel: translateResignationRiskLevel(employee.resignationRisk, language),
-      raiseSalary: formatCurrency(calculateRaiseSalary(employee.salary)),
-      raiseSalaryAmount: calculateRaiseSalary(employee.salary),
-      raiseActionLabel: copy.raise,
-      terminateActionLabel: copy.terminate,
-    })),
+    employeeRows: viewModel.staff.employees.map((employee) => {
+      const raiseSalaryAmount = calculateRaiseSalary(employee.salary);
+
+      return {
+        id: employee.id,
+        role: translateRole(employee.role, language),
+        salary: formatCurrency(employee.salary),
+        targetSalary: formatCurrency(employee.targetSalary),
+        personality: translatePersonality(employee.personality, language),
+        tenure: formatTenureMonths(employee.monthsTenure, language),
+        managementLevel: translateManagementLevel(employee.managementLevel, language),
+        resignationRisk: formatPercent(employee.resignationRisk),
+        resignationRiskLevel: translateResignationRiskLevel(employee.resignationRisk, language),
+        raiseSalary: formatCurrency(raiseSalaryAmount),
+        raiseSalaryAmount,
+        raiseActionLabel: copy.raise,
+        terminateActionLabel: copy.terminate,
+      };
+    }),
   };
 }
 
