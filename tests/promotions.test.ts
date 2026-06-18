@@ -1,7 +1,7 @@
 import {
   advanceEmployeeTenure,
   hireEmployee,
-  processPromotions
+  processPromotions,
 } from "../src/sim/employee-lifecycle";
 import type { Candidate } from "../src/sim/hiring";
 import { createInitialGameState } from "../src/sim/state";
@@ -20,10 +20,10 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
     background: {
       educationTier: "strong",
       major: "computer-science",
-      industryExperienceYears: 6
+      industryExperienceYears: 6,
     },
-    personality: "steady",
-    ...overrides
+    personality: 5,
+    ...overrides,
   };
 }
 
@@ -33,7 +33,7 @@ describe("employee promotions", () => {
     const employee = hireEmployee(state, {
       candidate: candidate(),
       salary: 20_000,
-      equityPercent: 0
+      equityPercent: 0,
     });
 
     expect(employee.managementLevel).toBe("individual");
@@ -45,7 +45,7 @@ describe("employee promotions", () => {
     const employee = hireEmployee(state, {
       candidate: candidate(),
       salary: 20_000,
-      equityPercent: 0
+      equityPercent: 0,
     });
     employee.monthsTenure = 12;
     const previousBurn = state.company.monthlyBurn;
@@ -65,7 +65,7 @@ describe("employee promotions", () => {
     const employee = hireEmployee(state, {
       candidate: candidate({ communication: 10, eq: 9, stressTolerance: 9 }),
       salary: 28_000,
-      equityPercent: 0.1
+      equityPercent: 0.1,
     });
     employee.managementLevel = "middle";
     employee.monthsTenure = 36;
@@ -82,7 +82,7 @@ describe("employee promotions", () => {
     hireEmployee(state, {
       candidate: candidate(),
       salary: 20_000,
-      equityPercent: 0
+      equityPercent: 0,
     });
     const previousCash = state.company.cash;
 

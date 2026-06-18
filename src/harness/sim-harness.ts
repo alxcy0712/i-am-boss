@@ -1,13 +1,15 @@
 import { PROBABILITY_CONFIG } from "../config/probabilities";
+import { runAIHiringCycle } from "../sim/ai-hiring";
 import { resolveCourtCase } from "../sim/court";
 import {
   advanceEmployeeTenure,
   hireEmployee,
   processPromotions,
-  processResignations
+  processResignations,
 } from "../sim/employee-lifecycle";
 import { applyBankLoan, prepareIpo } from "../sim/finance";
 import { advanceFounderLifecycle } from "../sim/founder-lifecycle";
+import { processInvestmentReturns, getPortfolioValue } from "../sim/investment";
 import { checkGameOver } from "../sim/game-over";
 import { negotiateHiring } from "../sim/hiring";
 import { applyLaborMarketPressure } from "../sim/labor-market";
@@ -21,16 +23,17 @@ import { applySocietyEvent } from "../sim/society";
 import { maybeApplySpecialEvent } from "../sim/special-events";
 import { generateCandidate, getHiringPlan } from "../sim/staffing";
 import { createInitialGameState } from "../sim/state";
+import { updateResources, calculateOperationalEfficiency } from "../sim/company-resources";
+import { processMonthlyGovernance, evaluateDelistingRisk } from "../sim/listed-governance";
 import type {
   AbilitySet,
   CompanyCulture,
   CompanyRole,
   CompanyRoleCounts,
-  EmployeePersonality,
   GameEvent,
   GameEventSummary,
   GameOverReason,
-  GameState
+  GameState,
 } from "../sim/types";
 import { createGameEventSummary, recordGameEvent } from "../sim/events";
 import { calculateCompanyValuation } from "../sim/valuation";
@@ -39,6 +42,7 @@ export interface HarnessInput {
   seed: number;
   days: number;
   initialChoiceId?: string;
+  aiHiringEnabled?: boolean;
 }
 
 export interface HarnessTimelineInput extends HarnessInput {
@@ -55,7 +59,7 @@ export interface HarnessEmployeeSummary {
   role: CompanyRole;
   salary: number;
   targetSalary: number;
-  personality: EmployeePersonality;
+  personality: number;
   monthsTenure: number;
   managementLevel: GameState["company"]["employees"][number]["managementLevel"];
   resignationRisk: number;
@@ -94,6 +98,17 @@ export interface HarnessSummary {
   eventSummary: GameEventSummary;
   eventLog: string[];
   gameOverReason?: GameOverReason;
+  aiHiringEnabled: boolean;
+  aiHires: number;
+  aiHiringFailures: number;
+  activeInsurancePolicies: number;
+  totalMonthlyInsurancePremiums: number;
+  investmentCount: number;
+  portfolioValue: number;
+  totalInvested: number;
+  investmentGain: number;
+  governanceScore?: number;
+  delistingRiskLevel?: string;
 }
 
 export interface HarnessCheckpoint {
@@ -119,25 +134,30 @@ export interface HarnessCheckpoint {
   cyclePhase: string;
   unemploymentRate: number;
   gameOverReason?: GameOverReason;
+  investmentCount: number;
+  portfolioValue: number;
+  governanceScore?: number;
+  delistingRiskLevel?: string;
 }
 
 export function runHarness(input: HarnessInput): HarnessSummary {
   const state = createInitialGameState({
     seed: input.seed,
-    initialChoiceId: input.initialChoiceId
+    initialChoiceId: input.initialChoiceId,
   });
   const result = advanceGameState(state, {
     seed: input.seed,
-    days: input.days
+    days: input.days,
+    aiHiringEnabled: input.aiHiringEnabled,
   });
 
-  return summarizeGameState(result.state, result.gameOverReason);
+  return summarizeGameState(result.state, result.gameOverReason, input.aiHiringEnabled);
 }
 
 export function runHarnessTimeline(input: HarnessTimelineInput): HarnessTimelineResult {
   const state = createInitialGameState({
     seed: input.seed,
-    initialChoiceId: input.initialChoiceId
+    initialChoiceId: input.initialChoiceId,
   });
   const checkpoints: HarnessCheckpoint[] = [];
   const result = advanceGameState(state, {
@@ -146,9 +166,10 @@ export function runHarnessTimeline(input: HarnessTimelineInput): HarnessTimeline
     checkpointIntervalDays: input.checkpointIntervalDays,
     recordCheckpoint: (checkpointState, gameOverReason) => {
       checkpoints.push(createHarnessCheckpoint(checkpointState, gameOverReason));
-    }
+    },
+    aiHiringEnabled: input.aiHiringEnabled,
   });
-  const summary = summarizeGameState(result.state, result.gameOverReason);
+  const summary = summarizeGameState(result.state, result.gameOverReason, input.aiHiringEnabled);
   const lastCheckpoint = checkpoints[checkpoints.length - 1];
 
   if (!lastCheckpoint || lastCheckpoint.day !== summary.daysPlayed) {
@@ -157,7 +178,7 @@ export function runHarnessTimeline(input: HarnessTimelineInput): HarnessTimeline
 
   return {
     summary,
-    checkpoints
+    checkpoints,
   };
 }
 
@@ -166,6 +187,7 @@ export interface AdvanceGameStateInput {
   days: number;
   checkpointIntervalDays?: number;
   recordCheckpoint?: (state: GameState, gameOverReason?: GameOverReason) => void;
+  aiHiringEnabled?: boolean;
 }
 
 export interface AdvanceGameStateResult {
@@ -175,7 +197,7 @@ export interface AdvanceGameStateResult {
 
 export function advanceGameState(
   state: GameState,
-  input: AdvanceGameStateInput
+  input: AdvanceGameStateInput,
 ): AdvanceGameStateResult {
   const rng = createSeededRng(input.seed + state.day);
   let gameOverReason: GameOverReason | undefined;
@@ -191,7 +213,7 @@ export function advanceGameState(
         type: "market_shock",
         cashDelta: 0,
         reputationDelta: 0,
-        marketSentimentDelta: -0.03
+        marketSentimentDelta: -0.03,
       });
     } else if (
       marketRoll <
@@ -202,11 +224,17 @@ export function advanceGameState(
         type: "policy_support",
         cashDelta: 5000,
         reputationDelta: 1,
-        marketSentimentDelta: 0.03
+        marketSentimentDelta: 0.03,
       });
     }
 
-    const dailyRevenue = (state.company.annualRevenue / 365) * state.marketSentiment;
+    const operationalEfficiency = calculateOperationalEfficiency({
+      resources: state.company.resources,
+      headcount: state.company.headcount,
+      culture: state.company.culture,
+    });
+    const dailyRevenue =
+      (state.company.annualRevenue / 365) * state.marketSentiment * operationalEfficiency;
     const dailyBurn = state.company.monthlyBurn / 30;
     state.company.cash += dailyRevenue - dailyBurn;
 
@@ -214,7 +242,7 @@ export function advanceGameState(
       applySocietyEvent(state, {
         type: "legal_incident",
         cashDelta: -2500,
-        reputationDelta: -1
+        reputationDelta: -1,
       });
     }
 
@@ -222,8 +250,25 @@ export function advanceGameState(
       advanceEmployeeTenure(state, { months: 1 });
       maybeApplySpecialEvent(state, {
         triggerRoll: rng.next(),
-        typeRoll: rng.next()
+        typeRoll: rng.next(),
       });
+      updateResources(state);
+
+      if (input.aiHiringEnabled) {
+        runAIHiringCycle(state, { seed: input.seed + state.day });
+      }
+
+      for (const policy of state.company.insurancePolicies) {
+        if (policy.active) {
+          state.company.cash -= policy.premium;
+        }
+      }
+
+      processInvestmentReturns(state, { seed: input.seed + state.day });
+
+      if (state.company.isPublic) {
+        processMonthlyGovernance(state, { seed: input.seed + state.day });
+      }
 
       const growth = 0.01 + state.company.reputation * 0.001 + rng.next() * 0.01;
       state.company.annualRevenue *= 1 + growth;
@@ -232,41 +277,42 @@ export function advanceGameState(
     if (state.day % 90 === 0) {
       const plannedRoles = getHiringPlan({
         headcount: state.company.headcount,
-        annualRevenue: state.company.annualRevenue
+        annualRevenue: state.company.annualRevenue,
+        resources: state.company.resources,
       });
       const role = plannedRoles[state.company.headcount % plannedRoles.length];
       const candidate = generateCandidate({
         seed: input.seed + state.day,
         role,
         seniority: state.company.headcount > 10 ? "mid" : "junior",
-        companyReputation: state.company.reputation
+        companyReputation: state.company.reputation,
       });
       const marketAdjustedCandidate = applyLaborMarketPressure(candidate, {
-        unemploymentRate: state.society.unemploymentRate
+        unemploymentRate: state.society.unemploymentRate,
       });
       const offer = {
         salary: Math.round(marketAdjustedCandidate.targetSalary * 0.96),
-        equityPercent: state.company.headcount < 5 ? 0.2 : 0.05
+        equityPercent: state.company.headcount < 5 ? 0.2 : 0.05,
       };
       const negotiation = negotiateHiring({
         seed: input.seed + state.day,
         companyReputation: state.company.reputation,
         companyCulture: state.company.culture,
         offer,
-        candidate: marketAdjustedCandidate
+        candidate: marketAdjustedCandidate,
       });
 
       if (negotiation.accepted) {
         hireEmployee(state, {
           candidate: marketAdjustedCandidate,
           salary: offer.salary,
-          equityPercent: offer.equityPercent
+          equityPercent: offer.equityPercent,
         });
         state.company.morale = Math.min(10, state.company.morale + 0.2);
       } else {
         recordGameEvent(state, {
           type: "hiring_failed",
-          role: candidate.role
+          role: candidate.role,
         });
       }
     }
@@ -286,14 +332,14 @@ export function advanceGameState(
     if (state.day % 210 === 0) {
       evaluatePolicySupport(state, {
         priorityIndustries: ["technology", "advanced-manufacturing"],
-        minimumReputation: 5
+        minimumReputation: 5,
       });
     }
 
     if (state.day % 240 === 0 && rng.next() < 0.25) {
       resolveCourtCase(state, {
         type: rng.next() > 0.5 ? "company_violation" : "employee_violation",
-        severity: 1 + Math.floor(rng.next() * 3)
+        severity: 1 + Math.floor(rng.next() * 3),
       });
     }
 
@@ -311,7 +357,8 @@ export function advanceGameState(
       profitMargin: 0.18,
       reputation: state.company.reputation,
       marketSentiment: state.marketSentiment,
-      listedMarketValue: state.company.listedMarketValue
+      listedMarketValue: state.company.listedMarketValue,
+      operationalCapability: state.company.operationalCapability,
     });
     state.company.valuation = valuation.value;
     state.founder.wealth = 20000 + state.company.valuation * 0.7;
@@ -322,17 +369,14 @@ export function advanceGameState(
       if (gameOverReason) {
         recordGameEvent(state, {
           type: "game_over",
-          reason: gameOverReason
+          reason: gameOverReason,
         });
       }
       input.recordCheckpoint?.(state, gameOverReason);
       break;
     }
 
-    if (
-      input.checkpointIntervalDays &&
-      state.day % input.checkpointIntervalDays === 0
-    ) {
+    if (input.checkpointIntervalDays && state.day % input.checkpointIntervalDays === 0) {
       input.recordCheckpoint?.(state);
     }
   }
@@ -342,19 +386,34 @@ export function advanceGameState(
 
 export function summarizeGameState(
   state: GameState,
-  gameOverReason?: GameOverReason
+  gameOverReason?: GameOverReason,
+  aiHiringEnabled?: boolean,
 ): HarnessSummary {
   const companyValuation = state.company.valuation;
   const playerWealth = state.founder.wealth;
   const staffRoleCounts = createStaffRoleCounts(state);
   const totalMonthlyPayroll = state.company.employees.reduce(
     (total, employee) => total + employee.salary,
-    0
+    0,
   );
   const averageEmployeeSalary =
     state.company.employees.length > 0
       ? Math.round(totalMonthlyPayroll / state.company.employees.length)
       : 0;
+
+  const aiHires = state.events.filter((e) => e.type === "ai_hire_succeeded").length;
+  const aiHiringFailures = state.events.filter((e) => e.type === "ai_hire_failed").length;
+
+  const activeInsurancePolicies = state.company.insurancePolicies.filter((p) => p.active).length;
+  const totalMonthlyInsurancePremiums = state.company.insurancePolicies
+    .filter((p) => p.active)
+    .reduce((sum, p) => sum + p.premium, 0);
+
+  const investmentCount = state.company.investments.length;
+  const portfolioValue = getPortfolioValue(state);
+  const totalInvested = state.company.investments.reduce((sum, inv) => sum + inv.amount, 0);
+  const investmentGain = portfolioValue - totalInvested;
+
   return {
     daysPlayed: state.day,
     companyValuation,
@@ -365,7 +424,7 @@ export function summarizeGameState(
     score: calculateFinalScore({
       daysPlayed: state.day,
       companyValuation,
-      playerWealth
+      playerWealth,
     }),
     cash: state.company.cash,
     headcount: state.company.headcount,
@@ -389,7 +448,7 @@ export function summarizeGameState(
         culturePressure: state.company.culturePressure,
         morale: state.company.morale,
         culture: state.company.culture,
-        personality: employee.personality
+        personality: employee.personality,
       }),
       abilities: {
         technical: employee.technical,
@@ -397,8 +456,8 @@ export function summarizeGameState(
         stressTolerance: employee.stressTolerance,
         communication: employee.communication,
         eq: employee.eq,
-        iq: employee.iq
-      }
+        iq: employee.iq,
+      },
     })),
     companyReputation: state.company.reputation,
     companyMorale: state.company.morale,
@@ -415,13 +474,24 @@ export function summarizeGameState(
     events: state.events,
     eventSummary: createGameEventSummary(state.events),
     eventLog: state.eventLog,
-    gameOverReason
+    gameOverReason,
+    aiHiringEnabled: aiHiringEnabled ?? false,
+    aiHires,
+    aiHiringFailures,
+    activeInsurancePolicies,
+    totalMonthlyInsurancePremiums,
+    investmentCount,
+    portfolioValue,
+    totalInvested,
+    investmentGain,
+    governanceScore: state.company.governanceMetrics?.overallScore,
+    delistingRiskLevel: state.company.isPublic ? evaluateDelistingRisk(state).riskLevel : undefined,
   };
 }
 
 function createHarnessCheckpoint(
   state: GameState,
-  gameOverReason?: GameOverReason
+  gameOverReason?: GameOverReason,
 ): HarnessCheckpoint {
   const summary = summarizeGameState(state, gameOverReason);
   return {
@@ -446,7 +516,11 @@ function createHarnessCheckpoint(
     founderHealth: summary.founderHealth,
     cyclePhase: summary.cyclePhase,
     unemploymentRate: summary.unemploymentRate,
-    gameOverReason: summary.gameOverReason
+    gameOverReason: summary.gameOverReason,
+    investmentCount: summary.investmentCount,
+    portfolioValue: summary.portfolioValue,
+    governanceScore: summary.governanceScore,
+    delistingRiskLevel: summary.delistingRiskLevel,
   };
 }
 
@@ -466,8 +540,8 @@ function createEmptyRoleCounts(): CompanyRoleCounts {
   return roles.reduce(
     (counts, role) => ({
       ...counts,
-      [role]: 0
+      [role]: 0,
     }),
-    {} as CompanyRoleCounts
+    {} as CompanyRoleCounts,
   );
 }

@@ -1,9 +1,8 @@
-import {
-  runHarness,
-  runHarnessTimeline,
-  summarizeGameState
-} from "../src/harness/sim-harness";
+import { runHarness, runHarnessTimeline, summarizeGameState } from "../src/harness/sim-harness";
+import { calculateFinalScore } from "../src/sim/scoring";
 import { hireEmployee } from "../src/sim/employee-lifecycle";
+import { purchaseInsurance } from "../src/sim/insurance";
+import { makeInvestment } from "../src/sim/investment";
 import { calculateResignationRisk } from "../src/sim/resignation";
 import { createInitialGameState } from "../src/sim/state";
 
@@ -15,9 +14,7 @@ describe("runHarness", () => {
     expect(second).toEqual(first);
     expect(first.daysPlayed).toBeGreaterThan(0);
     expect(first.companyValuation).toBeGreaterThan(0);
-    expect(first.score).toBe(
-      first.daysPlayed + first.companyValuation * 2 + first.playerWealth
-    );
+    expect(first.score).toBeCloseTo(calculateFinalScore(first));
     expect(first.headcount).toBeGreaterThanOrEqual(1);
     expect(first.debt).toBeGreaterThanOrEqual(0);
     expect(first.employeeCount).toBeGreaterThanOrEqual(0);
@@ -32,7 +29,7 @@ describe("runHarness", () => {
       stressTolerance: 5,
       communication: 5,
       eq: 5,
-      iq: 6
+      iq: 6,
     });
     expect(first.founderAge).toBeGreaterThanOrEqual(25);
     expect(first.founderHealth).toBeGreaterThanOrEqual(0);
@@ -41,6 +38,9 @@ describe("runHarness", () => {
     expect(first.policySupportCount).toBeGreaterThanOrEqual(0);
     expect(first.specialEventCount).toBeGreaterThanOrEqual(0);
     expect(first.eventLog.length).toBeGreaterThan(0);
+    expect(first.aiHiringEnabled).toBe(false);
+    expect(first.aiHires).toBe(0);
+    expect(first.aiHiringFailures).toBe(0);
   });
 
   it("surfaces seeded special events in long simulations", () => {
@@ -82,10 +82,10 @@ describe("runHarness", () => {
         background: {
           educationTier: "strong",
           major: "computer-science",
-          industryExperienceYears: 2
+          industryExperienceYears: 2,
         },
-        personality: "steady"
-      }
+        personality: 5,
+      },
     });
     hireEmployee(state, {
       salary: 9_000,
@@ -103,10 +103,10 @@ describe("runHarness", () => {
         background: {
           educationTier: "standard",
           major: "business",
-          industryExperienceYears: 1
+          industryExperienceYears: 1,
         },
-        personality: "collaborative"
-      }
+        personality: 5,
+      },
     });
 
     const summary = summarizeGameState(state);
@@ -117,7 +117,7 @@ describe("runHarness", () => {
       culturePressure: state.company.culturePressure,
       morale: state.company.morale,
       culture: state.company.culture,
-      personality: "steady"
+      personality: 5,
     });
 
     expect(summary.staffRoleCounts).toEqual({
@@ -125,7 +125,7 @@ describe("runHarness", () => {
       product: 0,
       sales: 1,
       finance: 0,
-      hr: 0
+      hr: 0,
     });
     expect(summary.totalMonthlyPayroll).toBe(21_000);
     expect(summary.averageEmployeeSalary).toBe(10_500);
@@ -137,7 +137,7 @@ describe("runHarness", () => {
       seed: 7,
       days: 200,
       initialChoiceId: "technical-founder",
-      checkpointIntervalDays: 90
+      checkpointIntervalDays: 90,
     };
     const timeline = runHarnessTimeline(input);
     const repeat = runHarnessTimeline(input);
@@ -149,10 +149,98 @@ describe("runHarness", () => {
     expect(timeline.checkpoints[0]).toMatchObject({
       day: 90,
       valuationKind: "private_estimate",
-      isPublic: false
+      isPublic: false,
     });
     expect(timeline.checkpoints[0].cash).toBeGreaterThanOrEqual(0);
     expect(timeline.checkpoints[0].companyValuation).toBeGreaterThan(0);
     expect(timeline.checkpoints[0].score).toBeGreaterThan(0);
+  });
+
+  it("includes AI hiring stats when aiHiringEnabled is true", () => {
+    const summary = runHarness({
+      seed: 42,
+      days: 365,
+      initialChoiceId: "technical-founder",
+      aiHiringEnabled: true,
+    });
+
+    expect(summary.aiHiringEnabled).toBe(true);
+    expect(summary.aiHires).toBeGreaterThanOrEqual(0);
+    expect(summary.aiHiringFailures).toBeGreaterThanOrEqual(0);
+  });
+
+  it("produces deterministic results with AI hiring enabled", () => {
+    const input = {
+      seed: 42,
+      days: 365,
+      initialChoiceId: "technical-founder",
+      aiHiringEnabled: true,
+    };
+    const first = runHarness(input);
+    const second = runHarness(input);
+
+    expect(second).toEqual(first);
+  });
+
+  it("may hire more employees with AI hiring enabled", () => {
+    const withoutAI = runHarness({
+      seed: 42,
+      days: 365,
+      initialChoiceId: "technical-founder",
+      aiHiringEnabled: false,
+    });
+    const withAI = runHarness({
+      seed: 42,
+      days: 365,
+      initialChoiceId: "technical-founder",
+      aiHiringEnabled: true,
+    });
+
+    expect(withAI.aiHiringEnabled).toBe(true);
+    expect(withoutAI.aiHiringEnabled).toBe(false);
+  });
+
+  it("defaults to zero active insurance policies", () => {
+    const summary = runHarness({ seed: 42, days: 365, initialChoiceId: "technical-founder" });
+
+    expect(summary.activeInsurancePolicies).toBe(0);
+    expect(summary.totalMonthlyInsurancePremiums).toBe(0);
+    expect(summary.investmentCount).toBe(0);
+    expect(summary.portfolioValue).toBe(0);
+    expect(summary.totalInvested).toBe(0);
+    expect(summary.investmentGain).toBe(0);
+  });
+
+  it("tracks insurance premiums in summary when policies are active", () => {
+    const state = createInitialGameState({ seed: 5, initialChoiceId: "network-founder" });
+    purchaseInsurance(state, { type: "legal" });
+
+    const summary = summarizeGameState(state);
+
+    expect(summary.activeInsurancePolicies).toBe(1);
+    expect(summary.totalMonthlyInsurancePremiums).toBeGreaterThan(0);
+  });
+
+  it("tracks investment stats in summary when investments exist", () => {
+    const state = createInitialGameState({ seed: 5, initialChoiceId: "network-founder" });
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    makeInvestment(state, { type: "bonds", amount: 15_000 });
+
+    const summary = summarizeGameState(state);
+
+    expect(summary.investmentCount).toBe(2);
+    expect(summary.portfolioValue).toBe(35_000);
+    expect(summary.totalInvested).toBe(35_000);
+    expect(summary.investmentGain).toBe(0);
+  });
+
+  it("includes investment fields in timeline checkpoints", () => {
+    const state = createInitialGameState({ seed: 6, initialChoiceId: "network-founder" });
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+
+    const summary = summarizeGameState(state);
+
+    expect(summary.investmentCount).toBe(1);
+    expect(summary.portfolioValue).toBeGreaterThan(0);
   });
 });

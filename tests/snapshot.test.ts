@@ -15,6 +15,6 @@ describe("game state snapshots", () => {
     expect(restored).toEqual(state);
     restored.company.cash += 1;
     expect(restored.company.cash).not.toBe(state.company.cash);
-    expect(snapshot).toContain("\"version\":1");
+    expect(snapshot).toContain('"version":1');
   });
 });

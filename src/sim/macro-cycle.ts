@@ -18,7 +18,7 @@ export function getKondratievPhase(day: number): MacroCycleInfo {
   return {
     name: phase,
     marketSentiment: config.marketSentiment,
-    unemploymentRate: config.unemploymentRate
+    unemploymentRate: config.unemploymentRate,
   };
 }
 

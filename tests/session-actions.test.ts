@@ -3,10 +3,11 @@ import {
   getSessionActions,
   performSessionAction,
   previewRecruitmentCandidate,
-  selectInitialChoice
+  selectInitialChoice,
 } from "../src/game/session";
 import { hireEmployee } from "../src/sim/employee-lifecycle";
 import type { Candidate } from "../src/sim/hiring";
+import { makeInvestment } from "../src/sim/investment";
 import { calculateResignationRisk } from "../src/sim/resignation";
 
 describe("session actions", () => {
@@ -19,7 +20,17 @@ describe("session actions", () => {
       "request-bank-loan",
       "request-policy-support",
       "prepare-ipo",
-      "change-culture"
+      "change-culture",
+      "toggle-ai-hiring",
+      "run-ai-hiring-cycle",
+      "purchase-insurance",
+      "file-insurance-claim",
+      "make-investment",
+      "sell-investment",
+      "buy-car",
+      "upgrade-car",
+      "get-married",
+      "have-child",
     ]);
   });
 
@@ -36,7 +47,7 @@ describe("session actions", () => {
     const before = session.summary?.cash ?? 0;
     const result = performSessionAction(session, {
       id: "request-bank-loan",
-      amount: 80_000
+      amount: 80_000,
     });
 
     expect(result.session.summary?.cash).toBeGreaterThan(before);
@@ -65,7 +76,7 @@ describe("session actions", () => {
 
     const lowOffer = performSessionAction(session, {
       id: "recruit-candidate",
-      salary: preview.minimumSalary - 1
+      salary: preview.minimumSalary - 1,
     });
     expect(lowOffer.message).toContain("below minimum");
     expect(lowOffer.session.summary?.headcount).toBe(session.summary?.headcount);
@@ -83,7 +94,7 @@ describe("session actions", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const result = performSessionAction(session, {
       id: "change-culture",
-      culture: "wolf"
+      culture: "wolf",
     });
 
     expect(result.session.state?.company.culture).toBe("wolf");
@@ -101,14 +112,14 @@ describe("session actions", () => {
     const employee = hireEmployee(session.state, {
       candidate: createCandidate("engineer"),
       salary: 12_000,
-      equityPercent: 0.2
+      equityPercent: 0.2,
     });
     const cashBefore = session.state.company.cash;
     const monthlyBurnBefore = session.state.company.monthlyBurn;
 
     const result = performSessionAction(session, {
       id: "terminate-employee",
-      employeeId: employee.id
+      employeeId: employee.id,
     });
 
     expect(result.message).toBe("Terminated engineer with ¥12,000 severance");
@@ -116,7 +127,9 @@ describe("session actions", () => {
     expect(result.session.summary?.headcount).toBe(1);
     expect(result.session.summary?.cash).toBe(cashBefore - 12_000);
     expect(result.session.state?.company.monthlyBurn).toBe(monthlyBurnBefore - 12_000);
-    expect(result.session.summary?.eventLog.at(-1)).toBe("Employee terminated: engineer, severance ¥12,000");
+    expect(result.session.summary?.eventLog.at(-1)).toBe(
+      "Employee terminated: engineer, severance ¥12,000",
+    );
   });
 
   it("raises an employee salary and lowers resignation risk", () => {
@@ -128,7 +141,7 @@ describe("session actions", () => {
     const employee = hireEmployee(session.state, {
       candidate: createCandidate("engineer"),
       salary: 9_000,
-      equityPercent: 0.2
+      equityPercent: 0.2,
     });
     const riskBefore = calculateResignationRisk({
       salary: employee.salary,
@@ -137,13 +150,13 @@ describe("session actions", () => {
       culturePressure: session.state.company.culturePressure,
       morale: session.state.company.morale,
       culture: session.state.company.culture,
-      personality: employee.personality
+      personality: employee.personality,
     });
     const monthlyBurnBefore = session.state.company.monthlyBurn;
 
     const result = performSessionAction(session, {
       id: "raise-employee-salary",
-      employeeId: employee.id
+      employeeId: employee.id,
     });
     const updatedEmployee = result.session.state?.company.employees[0];
     const riskAfter = result.session.summary?.employees[0].resignationRisk ?? 1;
@@ -154,8 +167,44 @@ describe("session actions", () => {
     expect(result.session.summary?.totalMonthlyPayroll).toBe(9_900);
     expect(riskAfter).toBeLessThan(riskBefore);
     expect(result.session.summary?.eventLog.at(-1)).toBe(
-      "Salary adjusted: engineer, salary ¥9,000 -> ¥9,900"
+      "Salary adjusted: engineer, salary ¥9,000 -> ¥9,900",
     );
+  });
+
+  it("makes an investment through a session action", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    const cashBefore = session.summary?.cash ?? 0;
+
+    const result = performSessionAction(session, {
+      id: "make-investment",
+      investmentType: "stocks",
+      amount: 20_000,
+    });
+
+    expect(result.message).toContain("Invested");
+    expect(result.message).toContain("stocks");
+    expect(result.session.state?.company.investments).toHaveLength(1);
+    expect(result.session.summary?.investmentCount).toBe(1);
+    expect(result.session.summary?.cash).toBeLessThan(cashBefore);
+  });
+
+  it("sells an investment through a session action", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+
+    const investResult = makeInvestment(session.state, { type: "bonds", amount: 20_000 });
+    const investmentId = investResult.investment!.id;
+
+    const result = performSessionAction(session, {
+      id: "sell-investment",
+      investmentId,
+    });
+
+    expect(result.message).toContain("Sold investment");
+    expect(result.session.state?.company.investments).toHaveLength(0);
+    expect(result.session.summary?.investmentCount).toBe(0);
   });
 });
 
@@ -173,8 +222,8 @@ function createCandidate(role: Candidate["role"]): Candidate {
     background: {
       educationTier: "strong",
       major: "computer-science",
-      industryExperienceYears: 2
+      industryExperienceYears: 2,
     },
-    personality: "steady"
+    personality: 5,
   };
 }

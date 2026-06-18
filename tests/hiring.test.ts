@@ -19,10 +19,10 @@ describe("negotiateHiring", () => {
         background: {
           educationTier: "standard",
           major: "computer-science",
-          industryExperienceYears: 4
+          industryExperienceYears: 4,
         },
-        personality: "steady"
-      }
+        personality: 5,
+      },
     });
 
     expect(result.accepted).toBe(false);
@@ -47,10 +47,10 @@ describe("negotiateHiring", () => {
         background: {
           educationTier: "standard",
           major: "computer-science",
-          industryExperienceYears: 4
+          industryExperienceYears: 4,
         },
-        personality: "steady"
-      }
+        personality: 5,
+      },
     });
 
     expect(result.accepted).toBe(true);

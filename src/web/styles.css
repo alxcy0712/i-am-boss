@@ -1,27 +1,107 @@
+/* ─── I AM BOSS · Pixel Art Theme ─────────────────────────────────── */
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('/fonts/PressStart2P-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
-  color: #f7f1dc;
-  background: #101015;
-  font-family: "Courier New", monospace;
+  /* -- Retro palette (NES/SNES inspired) -- */
+  --px-black:        #0a0a12;
+  --px-dark:         #101020;
+  --px-panel:        #181828;
+  --px-panel-light:  #1e2038;
+  --px-tile:         #222640;
+  --px-border:       #2a2e48;
+  --px-border-light: #383e5a;
+  --px-shadow:       #050510;
+
+  /* -- Text -- */
+  --px-text:         #f0e8c8;
+  --px-text-dim:     #9098a8;
+  --px-text-dark:    #101020;
+
+  /* -- Accent colours -- */
+  --px-green:        #30d860;
+  --px-green-dark:   #1a8038;
+  --px-green-glow:   #20ff50;
+  --px-gold:         #e8b830;
+  --px-gold-dark:    #a08020;
+  --px-red:          #e04040;
+  --px-red-dark:     #902020;
+  --px-blue:         #4888e0;
+  --px-blue-dark:    #284880;
+  --px-teal:         #58c8c8;
+  --px-teal-dark:    #388888;
+  --px-purple:       #b070d8;
+
+  /* -- District colours -- */
+  --px-dist-tower:      #5890d0;
+  --px-dist-bank:       #d0c060;
+  --px-dist-exchange:   #70b860;
+  --px-dist-labor:      #b080d0;
+  --px-dist-court:      #d08060;
+  --px-dist-policy:     #60b8b8;
+
+  /* -- Road -- */
+  --px-road:         #383830;
+  --px-road-line:    rgba(255, 255, 255, 0.14);
+
+  /* -- Typography -- */
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--px-text);
+  background: var(--px-black);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* ─── CRT Scanline Overlay ───────────────────────────────────────── */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(45, 49, 69, 0.72), rgba(16, 16, 21, 0.98)),
-    repeating-linear-gradient(0deg, #151822 0 4px, #101015 4px 8px);
+    /* Horizontal scanlines */
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 2px,
+      rgba(0, 0, 0, 0.08) 2px 4px
+    ),
+    /* Subtle vignette */
+    radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.35) 100%),
+    /* Deep pixel grid */
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.012) 0 1px,
+      transparent 1px 4px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.012) 0 1px,
+      transparent 1px 4px
+    ),
+    var(--px-dark);
+  image-rendering: pixelated;
 }
 
 button {
   font: inherit;
+  image-rendering: pixelated;
 }
+
+/* ─── Pixel Utility Mixin (via shared properties) ────────────────── */
+/*  All interactive panels share the pixel bevel look  */
 
 .shell {
   width: min(1180px, calc(100vw - 32px));
@@ -29,32 +109,41 @@ button {
   padding: 24px 0 32px;
 }
 
+/* ─── Hero / Title Bar ───────────────────────────────────────────── */
 .hero {
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 16px;
   min-height: 150px;
-  border-bottom: 4px solid #423b2d;
+  border-bottom: 4px solid var(--px-border-light);
+  /* Pixel glow on title area */
+  text-shadow: 0 0 8px rgba(48, 216, 96, 0.15);
 }
 
 .eyebrow,
 .subtitle {
   margin: 0;
-  color: #bfc4c8;
+  color: var(--px-text-dim);
 }
 
 .eyebrow {
   text-transform: uppercase;
+  letter-spacing: 2px;
 }
 
 h1 {
   margin: 10px 0;
-  font-size: 42px;
+  font-size: 28px;
   line-height: 1;
   letter-spacing: 0;
+  color: var(--px-text);
+  text-shadow:
+    2px 2px 0 var(--px-shadow),
+    0 0 12px rgba(48, 216, 96, 0.2);
 }
 
+/* ─── Shared Pixel Bevel (3D raised) ─────────────────────────────── */
 .score-chip,
 .choice-card,
 .stat-tile,
@@ -65,17 +154,30 @@ h1 {
 .finance-button,
 .finance-panel,
 .map-tile {
-  border: 3px solid #1f2329;
-  box-shadow: 4px 4px 0 #06070a;
+  border: 3px solid var(--px-border);
+  box-shadow:
+    /* Inner highlight (top-left light) */
+    inset 2px 2px 0 rgba(255, 255, 255, 0.08),
+    /* Outer 3D depth (bottom-right shadow) */
+    4px 4px 0 var(--px-shadow),
+    /* Subtle outline */
+    0 0 0 1px var(--px-shadow);
 }
 
+/* ─── Score Chip ─────────────────────────────────────────────────── */
 .score-chip {
   padding: 10px 12px;
-  color: #161616;
-  background: #f1c14f;
+  color: var(--px-text-dark);
+  background: var(--px-gold);
   text-transform: uppercase;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.25),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.2),
+    4px 4px 0 var(--px-shadow);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
 }
 
+/* ─── Hero Tools ─────────────────────────────────────────────────── */
 .hero-tools {
   display: grid;
   justify-items: end;
@@ -90,16 +192,20 @@ h1 {
 .language-button {
   min-width: 86px;
   padding: 8px 10px;
-  color: #f7f1dc;
-  background: #253142;
-  cursor: pointer;
+  color: var(--px-text);
+  background: var(--px-tile);
 }
 
 .language-button.is-selected {
-  color: #161616;
-  background: #22c55e;
+  color: var(--px-text-dark);
+  background: var(--px-green);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.25),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.15),
+    4px 4px 0 var(--px-shadow);
 }
 
+/* ─── Startup Choice Grid ────────────────────────────────────────── */
 .startup {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -107,13 +213,14 @@ h1 {
   padding: 24px 0;
 }
 
+/* ─── Interactive Cards & Buttons ────────────────────────────────── */
 .choice-card,
 .action-button,
 .offer-button,
 .language-button,
 .finance-button {
-  color: #f7f1dc;
-  background: #253142;
+  color: var(--px-text);
+  background: var(--px-tile);
   cursor: pointer;
 }
 
@@ -125,13 +232,29 @@ h1 {
   text-align: left;
 }
 
+/* Pixel "press" effect — shifts down-right, shadow shrinks */
 .choice-card:hover,
 .action-button:hover,
 .offer-button:hover,
 .language-button:hover,
 .finance-button:hover {
   transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 #06070a;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.08),
+    2px 2px 0 var(--px-shadow),
+    0 0 0 1px var(--px-shadow);
+}
+
+.choice-card:active,
+.action-button:active,
+.offer-button:active,
+.language-button:active,
+.finance-button:active {
+  transform: translate(3px, 3px);
+  box-shadow:
+    inset -2px -2px 0 rgba(255, 255, 255, 0.05),
+    inset 2px 2px 0 rgba(0, 0, 0, 0.15),
+    1px 1px 0 var(--px-shadow);
 }
 
 .choice-card:focus-visible,
@@ -140,21 +263,23 @@ h1 {
 .language-button:focus-visible,
 .finance-button:focus-visible,
 .district-tile:focus-visible {
-  outline: 3px solid #22c55e;
+  outline: 3px solid var(--px-green);
   outline-offset: 3px;
 }
 
 .choice-card span {
-  color: #bfc4c8;
-  line-height: 1.45;
+  color: var(--px-text-dim);
+  line-height: 1.6;
 }
 
+/* ─── Dashboard ──────────────────────────────────────────────────── */
 .dashboard {
   display: grid;
   gap: 18px;
   padding-top: 20px;
 }
 
+/* ─── Stat Grid (9 tiles) ────────────────────────────────────────── */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(9, minmax(94px, 1fr));
@@ -164,14 +289,14 @@ h1 {
 .stat-tile {
   min-height: 76px;
   padding: 10px;
-  background: #202836;
+  background: var(--px-panel-light);
 }
 
 .stat-tile span {
   display: block;
   min-height: 30px;
-  color: #a9b2bd;
-  font-size: 12px;
+  color: var(--px-text-dim);
+  font-size: 8px;
 }
 
 .stat-tile strong {
@@ -179,25 +304,47 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* ─── City Layout ────────────────────────────────────────────────── */
 .city-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 18px;
 }
 
+/* ─── City Map (pixel tile grid) ─────────────────────────────────── */
 .city-map {
   display: grid;
   grid-template-columns: repeat(6, minmax(48px, 1fr));
   grid-template-rows: repeat(5, minmax(64px, 1fr));
-  gap: 8px;
+  gap: 4px;
   min-height: 420px;
   padding: 14px;
+  /* Pixel grid lines over grass green */
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 16px),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 16px),
-    #1c5f4a;
+    /* Vertical grid lines */
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.06) 0 2px,
+      transparent 2px 16px
+    ),
+    /* Horizontal grid lines */
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.18) 0 2px,
+      transparent 2px 16px
+    ),
+    /* Grass base with noise-like dither */
+    repeating-conic-gradient(
+      rgba(255, 255, 255, 0.03) 0% 25%,
+      transparent 0% 50%
+    ) 0 0 / 8px 8px,
+    #18503a;
   image-rendering: pixelated;
   isolation: isolate;
+  border: 3px solid var(--px-border);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.05),
+    6px 6px 0 var(--px-shadow);
 }
 
 .map-tile {
@@ -208,19 +355,23 @@ h1 {
   padding: 6px;
   overflow: hidden;
   text-align: center;
+  font-size: 8px;
+  image-rendering: pixelated;
 }
 
 .map-tile span {
   position: relative;
   z-index: 2;
   overflow-wrap: anywhere;
-  line-height: 1.2;
+  line-height: 1.4;
+  text-shadow: 1px 1px 0 var(--px-shadow);
 }
 
+/* ─── District Tiles ─────────────────────────────────────────────── */
 .district-tile {
   position: relative;
   z-index: 3;
-  color: #171717;
+  color: var(--px-text-dark);
   cursor: pointer;
 }
 
@@ -231,55 +382,59 @@ h1 {
   pointer-events: none;
 }
 
+/* Window stripe pattern */
 .district-tile::before {
   inset: 8px 10px auto auto;
   width: 34%;
   height: 28%;
   background:
-    repeating-linear-gradient(90deg, #f6e8a7 0 6px, transparent 6px 12px),
-    #1f2329;
-  border: 2px solid #1f2329;
+    repeating-linear-gradient(90deg, #f0e0a0 0 6px, transparent 6px 12px),
+    var(--px-border);
+  border: 2px solid var(--px-border);
 }
 
+/* Ground shadow */
 .district-tile::after {
   inset: auto 0 0;
   height: 12px;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .district-tile:disabled {
-  color: #8d8d8d;
-  background: #3f4548;
+  color: #6a6a7a;
+  background: #3a3a48;
   cursor: default;
 }
 
+/* District background colours */
 .company-tower {
-  background: #74a6d8;
+  background: var(--px-dist-tower);
 }
 
 .bank-block {
-  background: #d8cb74;
+  background: var(--px-dist-bank);
 }
 
 .exchange-board {
-  background: #8fc47f;
+  background: var(--px-dist-exchange);
 }
 
 .labor-hall {
-  background: #c8a0d8;
+  background: var(--px-dist-labor);
 }
 
 .court-house {
-  background: #d89974;
+  background: var(--px-dist-court);
 }
 
 .policy-office {
-  background: #8bc7c7;
+  background: var(--px-dist-policy);
 }
 
+/* ─── Infrastructure (roads, plaza) ──────────────────────────────── */
 .infrastructure-tile {
   z-index: 1;
-  border-color: #2b2e34;
+  border-color: #2a2a30;
   box-shadow: none;
   color: transparent;
   pointer-events: none;
@@ -288,30 +443,44 @@ h1 {
 .road-horizontal,
 .road-vertical {
   background:
-    repeating-linear-gradient(90deg, transparent 0 18px, rgba(255, 255, 255, 0.18) 18px 24px),
-    #3d3f34;
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 18px,
+      var(--px-road-line) 18px 24px
+    ),
+    var(--px-road);
 }
 
 .road-vertical {
   background:
-    repeating-linear-gradient(0deg, transparent 0 18px, rgba(255, 255, 255, 0.18) 18px 24px),
-    #3d3f34;
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 18px,
+      var(--px-road-line) 18px 24px
+    ),
+    var(--px-road);
 }
 
 .plaza {
   z-index: 2;
-  color: #171717;
+  color: var(--px-text-dark);
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.2) 0 5px, transparent 5px 10px),
-    #d0b05f;
+    /* Checkerboard dither pattern */
+    repeating-conic-gradient(
+      rgba(255, 255, 255, 0.15) 0% 25%,
+      transparent 0% 50%
+    ) 0 0 / 10px 10px,
+    #c8a850;
 }
 
+/* ─── Command Panel (right sidebar) ──────────────────────────────── */
 .command-panel {
   display: grid;
   gap: 14px;
   align-content: start;
 }
 
+/* ─── Panel Cards ────────────────────────────────────────────────── */
 .founder-panel,
 .staff-panel,
 .culture-panel,
@@ -320,7 +489,11 @@ h1 {
   display: grid;
   gap: 12px;
   padding: 12px;
-  background: #151e2a;
+  background: var(--px-panel);
+  border: 3px solid var(--px-border);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.04),
+    4px 4px 0 var(--px-shadow);
 }
 
 .panel-heading {
@@ -328,14 +501,18 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #a9b2bd;
+  color: var(--px-text-dim);
+  border-bottom: 2px solid var(--px-border);
+  padding-bottom: 8px;
 }
 
 .panel-heading strong {
-  color: #22c55e;
+  color: var(--px-green);
   text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(48, 216, 96, 0.3);
 }
 
+/* ─── Inner Grids (founder, staff, candidate, finance, market) ──── */
 .founder-grid,
 .staff-grid,
 .candidate-meta,
@@ -368,8 +545,8 @@ h1 {
 .ability-row {
   min-width: 0;
   padding: 8px;
-  background: #202836;
-  border: 2px solid #2f3846;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
 }
 
 .founder-grid dt,
@@ -378,8 +555,8 @@ h1 {
 .finance-grid dt,
 .market-board dt,
 .ability-row span {
-  color: #a9b2bd;
-  font-size: 12px;
+  color: var(--px-text-dim);
+  font-size: 8px;
 }
 
 .founder-grid dd,
@@ -389,9 +566,10 @@ h1 {
 .market-board dd {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
-  line-height: 1.25;
+  line-height: 1.4;
 }
 
+/* ─── Role Mix ───────────────────────────────────────────────────── */
 .role-mix {
   display: grid;
   gap: 7px;
@@ -404,25 +582,26 @@ h1 {
   min-height: 34px;
   align-items: center;
   padding: 6px 8px;
-  background: #202836;
-  border: 2px solid #2f3846;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
 }
 
 .role-row span {
   min-width: 0;
   overflow: hidden;
-  color: #c3ccd3;
+  color: #b0b8c8;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .role-row strong,
 .role-row em {
-  color: #f7f1dc;
+  color: var(--px-text);
   text-align: right;
   font-style: normal;
 }
 
+/* ─── Culture Options ────────────────────────────────────────────── */
 .culture-options {
   display: grid;
   gap: 8px;
@@ -436,9 +615,9 @@ h1 {
   min-width: 0;
   min-height: 46px;
   padding: 7px 8px;
-  color: #d7deca;
-  background: #202836;
-  border: 2px solid #2f3846;
+  color: #c8d0b8;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
   text-align: left;
 }
 
@@ -447,12 +626,14 @@ h1 {
 }
 
 .culture-option.is-selected {
-  border-color: #22c55e;
-  box-shadow: inset 4px 0 0 #22c55e;
+  border-color: var(--px-green);
+  box-shadow:
+    inset 4px 0 0 var(--px-green),
+    0 0 8px rgba(48, 216, 96, 0.15);
 }
 
 .culture-option:hover:not(:disabled) {
-  border-color: #8bc7c7;
+  border-color: var(--px-teal);
 }
 
 .culture-option span,
@@ -464,24 +645,25 @@ h1 {
 }
 
 .culture-option span {
-  color: #a9b2bd;
-  font-size: 12px;
+  color: var(--px-text-dim);
+  font-size: 8px;
 }
 
 .culture-option .culture-name,
 .culture-option strong {
-  color: #f7f1dc;
-  font-size: 13px;
+  color: var(--px-text);
+  font-size: 9px;
 }
 
+/* ─── Employee Roster ────────────────────────────────────────────── */
 .employee-roster {
   display: grid;
   gap: 8px;
 }
 
 .roster-title {
-  color: #a9b2bd;
-  font-size: 12px;
+  color: var(--px-text-dim);
+  font-size: 8px;
   text-transform: uppercase;
 }
 
@@ -491,23 +673,24 @@ h1 {
   gap: 8px;
   min-width: 0;
   padding: 8px;
-  background: #202836;
-  border: 2px solid #2f3846;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
 }
 
+/* Risk indicator — coloured left bar */
 .employee-row[data-resignation-risk="低风险"],
 .employee-row[data-resignation-risk="Low risk"] {
-  box-shadow: inset 4px 0 0 #22c55e;
+  box-shadow: inset 4px 0 0 var(--px-green);
 }
 
 .employee-row[data-resignation-risk="中风险"],
 .employee-row[data-resignation-risk="Medium risk"] {
-  box-shadow: inset 4px 0 0 #f1c14f;
+  box-shadow: inset 4px 0 0 var(--px-gold);
 }
 
 .employee-row[data-resignation-risk="高风险"],
 .employee-row[data-resignation-risk="High risk"] {
-  box-shadow: inset 4px 0 0 #ef4444;
+  box-shadow: inset 4px 0 0 var(--px-red);
 }
 
 .employee-row > div {
@@ -528,35 +711,73 @@ h1 {
 
 .employee-row span,
 .employee-row small {
-  color: #a9b2bd;
+  color: var(--px-text-dim);
 }
 
+/* ─── Raise / Terminate Buttons ──────────────────────────────────── */
 .raise-button,
 .terminate-button {
   min-height: 30px;
   padding: 4px 6px;
+  border: 2px solid var(--px-border);
+  cursor: pointer;
 }
 
 .raise-button {
-  color: #111816;
-  background: #8bc7c7;
-  border-color: #c6f2ea;
+  color: var(--px-text-dark);
+  background: var(--px-teal);
+  border-color: #80e8d8;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.25),
+    3px 3px 0 var(--px-shadow);
+}
+
+.raise-button:hover {
+  transform: translate(1px, 1px);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.15),
+    2px 2px 0 var(--px-shadow);
+}
+
+.raise-button:active {
+  transform: translate(2px, 2px);
+  box-shadow:
+    inset -1px -1px 0 rgba(255, 255, 255, 0.1),
+    1px 1px 0 var(--px-shadow);
 }
 
 .terminate-button {
-  color: #f7f1dc;
-  background: #7f2f3a;
-  border-color: #ef4444;
+  color: var(--px-text);
+  background: var(--px-red-dark);
+  border-color: var(--px-red);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.08),
+    3px 3px 0 var(--px-shadow);
 }
 
+.terminate-button:hover {
+  transform: translate(1px, 1px);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.05),
+    2px 2px 0 var(--px-shadow);
+}
+
+.terminate-button:active {
+  transform: translate(2px, 2px);
+  box-shadow:
+    inset -1px -1px 0 rgba(0, 0, 0, 0.2),
+    1px 1px 0 var(--px-shadow);
+}
+
+/* ─── IPO Checklist ──────────────────────────────────────────────── */
 .ipo-checklist {
   display: grid;
   gap: 7px;
 }
 
 .checklist-title {
-  color: #a9b2bd;
-  font-size: 12px;
+  color: var(--px-text-dim);
+  font-size: 8px;
   text-transform: uppercase;
 }
 
@@ -567,31 +788,33 @@ h1 {
   min-height: 38px;
   align-items: center;
   padding: 7px 8px;
-  background: #202836;
-  border: 2px solid #2f3846;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
 }
 
 .ipo-requirement span {
-  color: #c3ccd3;
-  font-size: 12px;
+  color: #b0b8c8;
+  font-size: 8px;
 }
 
 .ipo-requirement strong {
   overflow-wrap: anywhere;
   text-align: right;
-  line-height: 1.25;
+  line-height: 1.4;
 }
 
 .ipo-requirement.is-met {
-  border-color: #22c55e;
-  background: #173524;
+  border-color: var(--px-green);
+  background: #142a1e;
+  box-shadow: 0 0 6px rgba(48, 216, 96, 0.12);
 }
 
 .ipo-requirement.is-open {
-  border-color: #615942;
-  background: #2a2b25;
+  border-color: #58503a;
+  background: #242218;
 }
 
+/* ─── Ability Grid (pixel progress bars) ─────────────────────────── */
 .ability-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -605,6 +828,7 @@ h1 {
   gap: 8px;
 }
 
+/* ─── Offer / Finance / Action Grids ─────────────────────────────── */
 .offer-grid,
 .finance-actions {
   display: grid;
@@ -626,44 +850,50 @@ h1 {
 
 .offer-button,
 .finance-button {
-  color: #111816;
-  background: #22c55e;
+  color: var(--px-text-dark);
+  background: var(--px-green);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.3),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.12),
+    4px 4px 0 var(--px-shadow);
 }
 
 .secondary-offer,
 .secondary-finance {
-  color: #f7f1dc;
-  background: #3b4656;
+  color: var(--px-text);
+  background: #384058;
 }
 
 .completed-finance {
-  border-color: #22c55e;
-  color: #d8ffe4;
-  background: #1f3a2a;
+  border-color: var(--px-green);
+  color: #c0ffd8;
+  background: #183020;
 }
 
 .action-button:disabled,
 .finance-button:disabled {
-  color: #7d8188;
-  background: #30333a;
+  color: #58606a;
+  background: #282a30;
   cursor: default;
   transform: none;
-  box-shadow: 4px 4px 0 #06070a;
+  box-shadow:
+    2px 2px 0 var(--px-shadow);
 }
 
 .finance-button.completed-finance:disabled {
-  border-color: #22c55e;
-  color: #d8ffe4;
-  background: #1f3a2a;
+  border-color: var(--px-green);
+  color: #c0ffd8;
+  background: #183020;
 }
 
+/* ─── Event Filter Bar ───────────────────────────────────────────── */
 .event-filter-bar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
   gap: 6px;
   padding: 10px;
-  background: #121923;
-  border: 3px solid #252b33;
+  background: var(--px-panel);
+  border: 3px solid var(--px-border);
   border-bottom: 0;
 }
 
@@ -675,18 +905,18 @@ h1 {
   min-width: 0;
   min-height: 34px;
   padding: 5px 7px;
-  color: #d7deca;
-  background: #202836;
-  border: 2px solid #2f3846;
+  color: #c0c8b0;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
   font: inherit;
   cursor: pointer;
 }
 
 .event-filter-button:hover,
 .event-filter-button.is-selected {
-  color: #111816;
-  background: #8bc7c7;
-  border-color: #c6f2ea;
+  color: var(--px-text-dark);
+  background: var(--px-teal);
+  border-color: #80e8d8;
 }
 
 .event-filter-button span {
@@ -700,28 +930,29 @@ h1 {
   flex: 0 0 auto;
   min-width: 24px;
   padding: 1px 4px;
-  color: #f7f1dc;
-  background: #151e2a;
-  border: 2px solid #2f3846;
+  color: var(--px-text);
+  background: var(--px-panel);
+  border: 2px solid var(--px-border);
   text-align: center;
 }
 
 .event-filter-button.is-selected strong,
 .event-filter-button:hover strong {
-  color: #111816;
-  background: #e3f9ef;
-  border-color: #111816;
+  color: var(--px-text-dark);
+  background: #b0f8e0;
+  border-color: var(--px-text-dark);
 }
 
+/* ─── Event Feed ─────────────────────────────────────────────────── */
 .event-feed {
   display: grid;
   gap: 8px;
   list-style: none;
   margin: 0;
   padding: 12px;
-  color: #d7deca;
-  background: #171d24;
-  border: 3px solid #252b33;
+  color: #c0c8b0;
+  background: var(--px-panel);
+  border: 3px solid var(--px-border);
 }
 
 .event-item {
@@ -731,24 +962,25 @@ h1 {
   min-width: 0;
   min-height: 44px;
   padding: 7px 8px;
-  background: #202836;
-  border: 2px solid #2f3846;
-  line-height: 1.35;
+  background: var(--px-panel-light);
+  border: 2px solid var(--px-border);
+  line-height: 1.5;
 }
 
+/* Severity indicators — pixel left bar */
 .event-item[data-event-severity="positive"] {
-  border-color: #22c55e;
-  box-shadow: inset 4px 0 0 #22c55e;
+  border-color: var(--px-green);
+  box-shadow: inset 4px 0 0 var(--px-green);
 }
 
 .event-item[data-event-severity="warning"] {
-  border-color: #f1c14f;
-  box-shadow: inset 4px 0 0 #f1c14f;
+  border-color: var(--px-gold);
+  box-shadow: inset 4px 0 0 var(--px-gold);
 }
 
 .event-item[data-event-severity="critical"] {
-  border-color: #ef4444;
-  box-shadow: inset 4px 0 0 #ef4444;
+  border-color: var(--px-red);
+  box-shadow: inset 4px 0 0 var(--px-red);
 }
 
 .event-meta {
@@ -763,26 +995,27 @@ h1 {
 .event-severity {
   display: block;
   overflow: hidden;
-  border: 2px solid #2f3846;
+  border: 2px solid var(--px-border);
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 8px;
 }
 
 .event-day {
-  color: #a9b2bd;
-  background: #151e2a;
+  color: var(--px-text-dim);
+  background: var(--px-panel);
 }
 
 .event-tag {
-  color: #111816;
-  background: #8bc7c7;
+  color: var(--px-text-dark);
+  background: var(--px-teal);
 }
 
 .event-severity {
-  color: #f7f1dc;
-  background: #3b4656;
-  font-size: 11px;
+  color: var(--px-text);
+  background: #384058;
+  font-size: 8px;
 }
 
 .event-text {
@@ -790,10 +1023,326 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.game-over {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 48px 24px;
+  text-align: center;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.game-over-scanlines {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 999;
+}
+
+.game-over-title {
+  font-family: "Press Start 2P", monospace;
+  font-size: 48px;
+  color: var(--px-red);
+  text-shadow: 4px 4px 0 var(--px-red-dark), 0 0 32px rgba(224, 64, 64, 0.5);
+  margin-bottom: 16px;
+  letter-spacing: 4px;
+}
+
+.game-over-reason {
+  font-family: "Press Start 2P", monospace;
+  font-size: 14px;
+  color: var(--px-text-dim);
+  margin-bottom: 40px;
+  text-transform: uppercase;
+}
+
+.game-over-score-section {
+  margin-bottom: 40px;
+}
+
+.game-over-score-label {
+  font-family: "Press Start 2P", monospace;
+  font-size: 12px;
+  color: var(--px-text-dim);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.game-over-score-value {
+  font-family: "Press Start 2P", monospace;
+  font-size: 56px;
+  color: var(--px-green);
+  text-shadow: 0 0 24px rgba(48, 216, 96, 0.6);
+  margin-bottom: 32px;
+}
+
+.game-over-breakdown {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 12px 24px;
+  margin: 0 auto 40px;
+  max-width: 600px;
+}
+
+.game-over-breakdown-header {
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  color: var(--px-text-dim);
+  text-transform: uppercase;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--px-border);
+}
+
+.game-over-breakdown-row {
+  display: contents;
+}
+
+.breakdown-label {
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  color: var(--px-text);
+  text-align: left;
+}
+
+.breakdown-value {
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  color: var(--px-text-dim);
+  text-align: right;
+}
+
+.breakdown-multiplier {
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  color: var(--px-gold);
+  text-align: center;
+}
+
+.breakdown-points {
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  color: var(--px-green);
+  text-align: right;
+}
+
+.game-over-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 0 auto 48px;
+  max-width: 600px;
+}
+
+.game-over-summary-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background: var(--px-panel);
+  border: 3px solid var(--px-border);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.05), 4px 4px 0 var(--px-shadow);
+}
+
+.summary-label {
+  font-family: "Press Start 2P", monospace;
+  font-size: 8px;
+  color: var(--px-text-dim);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.summary-value {
+  font-family: "Press Start 2P", monospace;
+  font-size: 20px;
+  color: var(--px-gold);
+}
+
+.game-over-play-again {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.game-over-play-again button {
+  font-family: "Press Start 2P", monospace;
+  font-size: 16px;
+  color: var(--px-text-dark);
+  background: var(--px-green);
+  border: 3px solid var(--px-green-dark);
+  padding: 20px 48px;
+  cursor: pointer;
+  box-shadow: inset -2px -2px 0 var(--px-green-dark), inset 2px 2px 0 var(--px-green-glow), 4px 4px 0 var(--px-shadow);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.game-over-play-again button:hover {
+  transform: translate(2px, 2px);
+  box-shadow: inset -2px -2px 0 var(--px-green-dark), inset 2px 2px 0 var(--px-green-glow), 2px 2px 0 var(--px-shadow);
+}
+
+.game-over-play-again button:active {
+  transform: translate(4px, 4px);
+  box-shadow: inset 2px 2px 0 var(--px-green-dark), inset -2px -2px 0 var(--px-green-glow);
+}
+
+.game-over-play-again .leaderboard-toggle {
+  color: var(--px-text);
+  background: var(--px-tile);
+  border-color: var(--px-border-light);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.08), 4px 4px 0 var(--px-shadow);
+}
+
+.game-over-play-again .leaderboard-toggle:hover {
+  background: var(--px-panel-light);
+}
+
+/* ─── Leaderboard ──────────────────────────────────────────────────── */
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.leaderboard-title {
+  font-family: "Press Start 2P", monospace;
+  font-size: 32px;
+  color: var(--px-gold);
+  text-shadow: 2px 2px 0 var(--px-gold-dark), 0 0 16px rgba(232, 184, 48, 0.4);
+  margin-bottom: 32px;
+  letter-spacing: 4px;
+}
+
+.leaderboard-empty {
+  font-family: "Press Start 2P", monospace;
+  font-size: 12px;
+  color: var(--px-text-dim);
+  padding: 48px;
+  text-align: center;
+}
+
+.leaderboard-table-wrapper {
+  width: 100%;
+  max-width: 900px;
+  overflow-x: auto;
+  margin-bottom: 32px;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  font-family: "Press Start 2P", monospace;
+  font-size: 9px;
+}
+
+.leaderboard-table thead th {
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--px-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid var(--px-border-light);
+}
+
+.leaderboard-table tbody tr {
+  background: var(--px-panel);
+  border: 2px solid var(--px-border);
+  transition: background 0.15s;
+}
+
+.leaderboard-table tbody tr:hover {
+  background: var(--px-panel-light);
+}
+
+.leaderboard-table tbody td {
+  padding: 10px 12px;
+  border-top: 2px solid var(--px-border);
+  border-bottom: 2px solid var(--px-border);
+  color: var(--px-text);
+}
+
+.leaderboard-table tbody td:first-child {
+  border-left: 2px solid var(--px-border);
+  border-top-left-radius: 2px;
+  border-bottom-left-radius: 2px;
+}
+
+.leaderboard-table tbody td:last-child {
+  border-right: 2px solid var(--px-border);
+  border-top-right-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+
+.leaderboard-table .leaderboard-score {
+  color: var(--px-green);
+  text-shadow: 0 0 6px rgba(48, 216, 96, 0.3);
+}
+
+.leaderboard-table tbody tr.is-current-game {
+  border-color: var(--px-gold);
+  box-shadow: 0 0 8px rgba(232, 184, 48, 0.2);
+}
+
+.leaderboard-table tbody tr.is-current-game td {
+  border-color: var(--px-gold);
+  color: var(--px-gold);
+}
+
+.leaderboard-table tbody tr.is-current-game td:first-child {
+  box-shadow: inset 4px 0 0 var(--px-gold);
+}
+
+.leaderboard-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.leaderboard-actions button {
+  font-family: "Press Start 2P", monospace;
+  font-size: 12px;
+  color: var(--px-text);
+  background: var(--px-tile);
+  border: 3px solid var(--px-border);
+  padding: 14px 32px;
+  cursor: pointer;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.08), 4px 4px 0 var(--px-shadow);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.leaderboard-actions button:hover {
+  transform: translate(2px, 2px);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.05), 2px 2px 0 var(--px-shadow);
+}
+
+.leaderboard-actions button:active {
+  transform: translate(4px, 4px);
+  box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.05), inset 1px 1px 0 rgba(0, 0, 0, 0.15);
+}
+
 .is-hidden {
   display: none;
 }
 
+/* ─── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .hero,
   .city-layout {

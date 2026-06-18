@@ -6,7 +6,7 @@ describe("createGameViewModel", () => {
     const summary = runHarness({
       seed: 1,
       days: 120,
-      initialChoiceId: "network-founder"
+      initialChoiceId: "network-founder",
     });
     const viewModel = createGameViewModel(summary);
 
@@ -24,7 +24,7 @@ describe("createGameViewModel", () => {
       "exchange",
       "labor-market",
       "court",
-      "policy-office"
+      "policy-office",
     ]);
     expect(viewModel.eventFeed.length).toBeLessThanOrEqual(8);
     expect(viewModel.events.length).toBeLessThanOrEqual(8);

@@ -1,7 +1,7 @@
 import { PROBABILITY_CONFIG } from "../config/probabilities";
 import { calculateCultureFit } from "./culture-fit";
 import { clamp } from "./rng";
-import type { CompanyCulture, EmployeePersonality } from "./types";
+import type { CompanyCulture } from "./types";
 
 export interface ResignationRiskInput {
   salary: number;
@@ -10,7 +10,7 @@ export interface ResignationRiskInput {
   culturePressure: number;
   morale: number;
   culture?: CompanyCulture;
-  personality?: EmployeePersonality;
+  personality?: number;
 }
 
 export function calculateResignationRisk(input: ResignationRiskInput): number {
@@ -18,21 +18,29 @@ export function calculateResignationRisk(input: ResignationRiskInput): number {
   const pressureGap = clamp((input.culturePressure - input.stressTolerance) / 10, 0, 1);
   const moraleGap = clamp((10 - input.morale) / 10, 0, 1);
   const cultureMismatch =
-    input.culture && input.personality
+    input.culture !== undefined && input.personality !== undefined
       ? 1 -
         calculateCultureFit({
           culture: input.culture,
-          personality: input.personality
+          personality: input.personality,
         })
       : 0;
 
+  const config = PROBABILITY_CONFIG.resignation;
+  const personalityFactor =
+    input.personality !== undefined
+      ? config.lowPersonalitySalaryWeight +
+        (input.personality / 10) *
+          (config.highPersonalitySalaryWeight - config.lowPersonalitySalaryWeight)
+      : 1;
+
   return clamp(
-    PROBABILITY_CONFIG.resignation.baseRisk +
-      salaryGap * PROBABILITY_CONFIG.resignation.salaryGapWeight +
-      pressureGap * PROBABILITY_CONFIG.resignation.pressureWeight +
-      moraleGap * PROBABILITY_CONFIG.resignation.moraleWeight +
+    config.baseRisk +
+      salaryGap * config.salaryGapWeight * personalityFactor +
+      pressureGap * config.pressureWeight +
+      moraleGap * config.moraleWeight +
       cultureMismatch * PROBABILITY_CONFIG.cultureFit.resignationRiskWeight,
     0,
-    0.95
+    0.95,
   );
 }

@@ -12,7 +12,7 @@ describe("createBalanceCliReport", () => {
       "--days",
       "30",
       "--maxEventLogEntries",
-      "2"
+      "2",
     ]);
 
     expect(report.runs).toBe(2);
@@ -33,7 +33,7 @@ describe("createBalanceCliReport", () => {
       "--maxEventLogEntries",
       "2",
       "--checkpointIntervalDays",
-      "90"
+      "90",
     ]);
 
     expect(report.checkpointSummaries?.map((checkpoint) => checkpoint.day)).toContain(90);
@@ -51,7 +51,7 @@ describe("createBalanceCliReport", () => {
       "2",
       "--days",
       "30",
-      "--summaryOnly"
+      "--summaryOnly",
     ]);
 
     expect(report.results).toBeUndefined();

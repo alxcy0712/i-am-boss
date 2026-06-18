@@ -5,10 +5,7 @@ export interface LaborMarketInput {
   unemploymentRate: number;
 }
 
-export function applyLaborMarketPressure(
-  candidate: Candidate,
-  input: LaborMarketInput
-): Candidate {
+export function applyLaborMarketPressure(candidate: Candidate, input: LaborMarketInput): Candidate {
   let multiplier = 1;
 
   if (input.unemploymentRate >= PROBABILITY_CONFIG.laborMarket.highUnemploymentThreshold) {
@@ -22,6 +19,6 @@ export function applyLaborMarketPressure(
   return {
     ...candidate,
     targetSalary: Math.round(candidate.targetSalary * multiplier),
-    minimumSalary: Math.round(candidate.minimumSalary * multiplier)
+    minimumSalary: Math.round(candidate.minimumSalary * multiplier),
   };
 }

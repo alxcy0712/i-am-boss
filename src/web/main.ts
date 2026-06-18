@@ -3,8 +3,9 @@ import {
   performSessionAction,
   selectInitialChoice,
   type GameSession,
-  type SessionActionRequest
+  type SessionActionRequest,
 } from "../game/session";
+import { addToLeaderboard } from "../sim/leaderboard";
 import { createWebScreenModel, type WebEventCategoryFilter } from "./screen";
 import { DEFAULT_WEB_LANGUAGE, resolveWebLanguage, type WebLanguage } from "./i18n";
 import "./styles.css";
@@ -13,19 +14,26 @@ const CULTURE_ROTATION: SessionActionRequest[] = [
   { id: "change-culture", culture: "adaptive" },
   { id: "change-culture", culture: "wolf" },
   { id: "change-culture", culture: "striver" },
-  { id: "change-culture", culture: "laissez-faire" }
+  { id: "change-culture", culture: "laissez-faire" },
 ];
 
 let session: GameSession = createGameSession({ seed: 1 });
 let language: WebLanguage = readInitialLanguage();
 let eventCategoryFilter: WebEventCategoryFilter = "all";
+let showLeaderboard = false;
+let currentLeaderboardId: string | undefined;
 const root = getAppRoot();
 
 render();
 
 function render(): void {
   document.documentElement.lang = language;
-  const screen = createWebScreenModel(session, { language, eventCategoryFilter });
+  const screen = createWebScreenModel(session, {
+    language,
+    eventCategoryFilter,
+    showLeaderboard,
+    currentLeaderboardId,
+  });
 
   root.innerHTML = `
     <main class="shell" data-stage="${screen.stage}">
@@ -48,7 +56,7 @@ function render(): void {
                   >
                     ${option.label}
                   </button>
-                `
+                `,
               )
               .join("")}
           </div>
@@ -64,12 +72,15 @@ function render(): void {
                 <strong>${choice.label}</strong>
                 <span>${choice.description}</span>
               </button>
-            `
+            `,
           )
           .join("")}
       </section>
 
-      <section class="dashboard ${screen.stage === "startup" ? "is-hidden" : ""}">
+      ${screen.gameOverScreen ? renderGameOverSection(screen.gameOverScreen) : ""}
+      ${screen.leaderboardScreen ? renderLeaderboardSection(screen.leaderboardScreen) : ""}
+
+      <section class="dashboard ${screen.stage === "operating" ? "" : "is-hidden"}">
         <div class="stat-grid">
           ${screen.statTiles
             .map(
@@ -78,7 +89,7 @@ function render(): void {
                   <span>${tile.label}</span>
                   <strong>${tile.value}</strong>
                 </article>
-              `
+              `,
             )
             .join("")}
         </div>
@@ -106,7 +117,7 @@ function render(): void {
                     >
                       ${action.label}
                     </button>
-                  `
+                  `,
                 )
                 .join("")}
             </div>
@@ -148,8 +159,37 @@ function render(): void {
   root.querySelectorAll<HTMLButtonElement>("[data-action-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const actionId = button.dataset.actionId;
+      if (actionId === "play-again") {
+        session = createGameSession({ seed: Date.now() });
+        showLeaderboard = false;
+        currentLeaderboardId = undefined;
+        render();
+        return;
+      }
+      if (actionId === "view-leaderboard") {
+        showLeaderboard = true;
+        render();
+        return;
+      }
+      if (actionId === "back-to-game-over") {
+        showLeaderboard = false;
+        render();
+        return;
+      }
       if (actionId) {
         session = performSessionAction(session, createActionRequest(actionId, button)).session;
+        if (session.gameOverReason && !currentLeaderboardId) {
+          const summary = session.summary;
+          if (summary) {
+            const entry = addToLeaderboard({
+              daysPlayed: summary.daysPlayed,
+              companyValuation: summary.companyValuation,
+              playerWealth: summary.playerWealth,
+              gameOverReason: session.gameOverReason,
+            });
+            currentLeaderboardId = entry.id;
+          }
+        }
         render();
       }
     });
@@ -157,7 +197,7 @@ function render(): void {
 }
 
 function renderFounderPanel(
-  founder: NonNullable<ReturnType<typeof createWebScreenModel>["founder"]>
+  founder: NonNullable<ReturnType<typeof createWebScreenModel>["founder"]>,
 ): string {
   return `
     <section class="founder-panel" aria-label="${founder.title}">
@@ -187,7 +227,7 @@ function renderFounderPanel(
                 <span>${row.label}</span>
                 <strong>${row.value}</strong>
               </div>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -196,7 +236,7 @@ function renderFounderPanel(
 }
 
 function renderCulturePanel(
-  culture: NonNullable<ReturnType<typeof createWebScreenModel>["culture"]>
+  culture: NonNullable<ReturnType<typeof createWebScreenModel>["culture"]>,
 ): string {
   return `
     <section class="culture-panel" aria-label="${culture.title}">
@@ -222,7 +262,7 @@ function renderCulturePanel(
                 <span>${culture.resignationRiskLabel}: ${option.projectedAverageResignationRisk}</span>
                 <strong>${option.actionLabel}</strong>
               </button>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -232,7 +272,7 @@ function renderCulturePanel(
 
 function renderStaffPanel(
   staff: NonNullable<ReturnType<typeof createWebScreenModel>["staff"]>,
-  copy: ReturnType<typeof createWebScreenModel>["copy"]
+  copy: ReturnType<typeof createWebScreenModel>["copy"],
 ): string {
   return `
     <section class="staff-panel" aria-label="${staff.title}">
@@ -263,7 +303,7 @@ function renderStaffPanel(
                 <strong>${row.count}</strong>
                 <em>${row.share}</em>
               </div>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -307,7 +347,7 @@ function renderStaffPanel(
                   </button>
                 </div>
               </div>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -315,10 +355,7 @@ function renderStaffPanel(
   `;
 }
 
-function createActionRequest(
-  actionId: string,
-  source?: HTMLButtonElement
-): SessionActionRequest {
+function createActionRequest(actionId: string, source?: HTMLButtonElement): SessionActionRequest {
   if (actionId === "advance-30-days") {
     return { id: "advance-30-days" };
   }
@@ -327,7 +364,7 @@ function createActionRequest(
     return {
       id: "recruit-candidate",
       salary: readNumberData(source, "salary"),
-      equityPercent: readNumberData(source, "equity")
+      equityPercent: readNumberData(source, "equity"),
     };
   }
 
@@ -338,7 +375,7 @@ function createActionRequest(
   if (actionId === "terminate-employee") {
     return {
       id: "terminate-employee",
-      employeeId: source?.dataset.employeeId ?? ""
+      employeeId: source?.dataset.employeeId ?? "",
     };
   }
 
@@ -346,7 +383,7 @@ function createActionRequest(
     return {
       id: "raise-employee-salary",
       employeeId: source?.dataset.employeeId ?? "",
-      salary: readNumberData(source, "raiseSalary")
+      salary: readNumberData(source, "raiseSalary"),
     };
   }
 
@@ -372,12 +409,64 @@ function createActionRequest(
     return CULTURE_ROTATION[index];
   }
 
+  if (actionId === "toggle-ai-hiring") {
+    return { id: "toggle-ai-hiring" };
+  }
+
+  if (actionId === "run-ai-hiring-cycle") {
+    return { id: "run-ai-hiring-cycle" };
+  }
+
+  if (actionId === "purchase-insurance") {
+    return { id: "purchase-insurance", insuranceType: "legal" };
+  }
+
+  if (actionId === "file-insurance-claim") {
+    return {
+      id: "file-insurance-claim",
+      policyId: session.state?.company.insurancePolicies.find((policy) => policy.active)?.id ?? "",
+      damageAmount: 10_000,
+    };
+  }
+
+  if (actionId === "make-investment") {
+    return { id: "make-investment", investmentType: "stocks", amount: 20_000 };
+  }
+
+  if (actionId === "sell-investment") {
+    return {
+      id: "sell-investment",
+      investmentId: session.state?.company.investments[0]?.id ?? "",
+    };
+  }
+
+  if (actionId === "buy-car") {
+    return { id: "buy-car", brand: "Founder EV", value: 10_000 };
+  }
+
+  if (actionId === "upgrade-car") {
+    const car = session.state?.founder.personalLife.cars[0];
+    return {
+      id: "upgrade-car",
+      carId: car?.id ?? "",
+      newValue: (car?.value ?? 10_000) + 5_000,
+    };
+  }
+
+  if (actionId === "get-married") {
+    return { id: "get-married", spouseName: "Alex" };
+  }
+
+  if (actionId === "have-child") {
+    return { id: "have-child", childName: "Robin" };
+  }
+
   return { id: "advance-30-days" };
 }
 
 function renderRecruitmentPanel(
   recruitment: NonNullable<ReturnType<typeof createWebScreenModel>["recruitment"]>,
-  copy: ReturnType<typeof createWebScreenModel>["copy"]
+  copy: ReturnType<typeof createWebScreenModel>["copy"],
 ): string {
   return `
     <section class="recruitment-panel" aria-label="${copy.recruitmentDesk}">
@@ -411,7 +500,7 @@ function renderRecruitmentPanel(
                 <span>${row.label}</span>
                 <strong>${row.value}</strong>
               </div>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -429,7 +518,7 @@ function renderRecruitmentPanel(
               >
                 ${offer.label}
               </button>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -439,7 +528,7 @@ function renderRecruitmentPanel(
 
 function renderFinancePanel(
   finance: NonNullable<ReturnType<typeof createWebScreenModel>["finance"]>,
-  copy: ReturnType<typeof createWebScreenModel>["copy"]
+  copy: ReturnType<typeof createWebScreenModel>["copy"],
 ): string {
   return `
     <section class="finance-panel" aria-label="${copy.financeDesk}">
@@ -495,7 +584,7 @@ function renderFinancePanel(
                 <span>${requirement.label}</span>
                 <strong>${requirement.current} / ${requirement.required}</strong>
               </div>
-            `
+            `,
           )
           .join("")}
       </div>
@@ -540,7 +629,7 @@ function renderEventFeed(screen: ReturnType<typeof createWebScreenModel>): strin
                   <span>${option.label}</span>
                   <strong>${option.count}</strong>
                 </button>
-              `
+              `,
             )
             .join("")}
         </div>
@@ -565,7 +654,7 @@ function renderEventFeed(screen: ReturnType<typeof createWebScreenModel>): strin
                 </span>
                 <span class="event-text">${item.text}</span>
               </li>
-            `
+            `,
           )
           .join("")
       : screen.eventFeed.map((entry) => `<li class="event-item">${entry}</li>`).join("");
@@ -573,9 +662,122 @@ function renderEventFeed(screen: ReturnType<typeof createWebScreenModel>): strin
   return `${filterBar}<ol class="event-feed">${entries}</ol>`;
 }
 
-function renderMapTile(
-  tile: ReturnType<typeof createWebScreenModel>["mapTiles"][number]
+function renderGameOverSection(
+  gameOver: ReturnType<typeof createWebScreenModel>["gameOverScreen"],
 ): string {
+  if (!gameOver) {
+    return "";
+  }
+
+  return `
+    <section class="game-over" aria-label="${gameOver.title}">
+      <div class="game-over-scanlines" aria-hidden="true"></div>
+      <h1 class="game-over-title">${gameOver.title}</h1>
+      <p class="game-over-reason">${gameOver.reasonLabel}: <strong>${gameOver.reasonValue}</strong></p>
+      <div class="game-over-score-section">
+        <p class="game-over-score-label">${gameOver.scoreBreakdownTitle}</p>
+        <p class="game-over-score-value">${gameOver.finalScore}</p>
+      </div>
+      <div class="game-over-breakdown">
+        <span class="game-over-breakdown-title">${gameOver.scoreBreakdownTitle}</span>
+        ${gameOver.scoreRows
+          .map(
+            (row) => `
+              <div class="game-over-breakdown-row">
+                <span class="breakdown-label">${row.label}</span>
+                <span class="breakdown-value">${row.value}</span>
+                <span class="breakdown-multiplier">${row.multiplier}</span>
+                <strong class="breakdown-points">${row.points}</strong>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      <div class="game-over-summary">
+        <span class="game-over-summary-title">${gameOver.summaryTitle}</span>
+        ${gameOver.summaryRows
+          .map(
+            (row) => `
+              <div class="game-over-summary-row">
+                <span>${row.label}</span>
+                <strong>${row.value}</strong>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      <div class="game-over-play-again">
+        <button type="button" data-action-id="play-again">
+          ${gameOver.playAgainLabel}
+        </button>
+        <button type="button" data-action-id="view-leaderboard" class="leaderboard-toggle">
+          ${gameOver.viewLeaderboardLabel}
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderLeaderboardSection(
+  leaderboard: NonNullable<ReturnType<typeof createWebScreenModel>["leaderboardScreen"]>,
+): string {
+  if (!leaderboard) {
+    return "";
+  }
+
+  const headerKeys = [
+    "rank",
+    "score",
+    "daysPlayed",
+    "companyValuation",
+    "playerWealth",
+    "gameOverReason",
+    "date",
+  ] as const;
+
+  return `
+    <section class="leaderboard" aria-label="${leaderboard.title}">
+      <h2 class="leaderboard-title">${leaderboard.title}</h2>
+      ${
+        leaderboard.rows.length === 0
+          ? `<p class="leaderboard-empty">${leaderboard.emptyMessage}</p>`
+          : `<div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  ${headerKeys.map((key) => `<th>${leaderboard.headers[key]}</th>`).join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${leaderboard.rows
+                  .map(
+                    (row) => `
+                      <tr class="${row.isCurrentGame ? "is-current-game" : ""}">
+                        <td>${row.rank}</td>
+                        <td class="leaderboard-score">${row.score}</td>
+                        <td>${row.daysPlayed}</td>
+                        <td>${row.companyValuation}</td>
+                        <td>${row.playerWealth}</td>
+                        <td>${row.gameOverReason}</td>
+                        <td>${row.date}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>`
+      }
+      <div class="leaderboard-actions">
+        <button type="button" data-action-id="back-to-game-over">
+          ${leaderboard.backLabel}
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderMapTile(tile: ReturnType<typeof createWebScreenModel>["mapTiles"][number]): string {
   const style = `grid-area: ${tile.gridArea};`;
 
   if (tile.kind === "district") {
@@ -628,7 +830,7 @@ function readEventCategoryFilter(value: string | undefined): WebEventCategoryFil
 }
 
 function readCompanyCulture(
-  value: string | undefined
+  value: string | undefined,
 ): Extract<SessionActionRequest, { id: "change-culture" }>["culture"] | undefined {
   if (
     value === "wolf" ||

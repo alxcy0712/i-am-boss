@@ -21,7 +21,7 @@ describe("applySocietyEvent", () => {
     applySocietyEvent(state, {
       type: "legal_incident",
       cashDelta: -15_000,
-      reputationDelta: -2
+      reputationDelta: -2,
     });
 
     expect(state.company.cash).toBe(previousCash - 15_000);

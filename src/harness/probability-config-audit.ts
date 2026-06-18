@@ -30,23 +30,17 @@ export const REQUIRED_PROBABILITY_SECTIONS = [
   "policy",
   "court",
   "laborMarket",
-  "securitiesMarket"
+  "securitiesMarket",
 ] as const;
 
 export function auditProbabilityConfig(): ProbabilityConfigAudit {
-  const sourcePath = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../config/probabilities.ts"
-  );
-  return auditProbabilityConfigSource(
-    PROBABILITY_CONFIG,
-    readFileSync(sourcePath, "utf8")
-  );
+  const sourcePath = resolve(dirname(fileURLToPath(import.meta.url)), "../config/probabilities.ts");
+  return auditProbabilityConfigSource(PROBABILITY_CONFIG, readFileSync(sourcePath, "utf8"));
 }
 
 export function auditProbabilityConfigSource(
   config: Record<string, unknown>,
-  sourceText: string
+  sourceText: string,
 ): ProbabilityConfigAudit {
   const topLevelSections = Object.keys(config);
   const numericLeaves = collectNumericLeaves(config);
@@ -55,7 +49,7 @@ export function auditProbabilityConfigSource(
     topLevelSections,
     requiredSections: [...REQUIRED_PROBABILITY_SECTIONS],
     missingRequiredSections: REQUIRED_PROBABILITY_SECTIONS.filter(
-      (section) => !topLevelSections.includes(section)
+      (section) => !topLevelSections.includes(section),
     ),
     numericLeafCount: numericLeaves.length,
     invalidChancePaths: numericLeaves
@@ -63,14 +57,14 @@ export function auditProbabilityConfigSource(
       .filter((leaf) => leaf.value < 0 || leaf.value > 1)
       .map((leaf) => leaf.path),
     uncommentedSections: topLevelSections.filter(
-      (section) => !sectionBlockHasComment(sourceText, section)
-    )
+      (section) => !sectionBlockHasComment(sourceText, section),
+    ),
   };
 }
 
 function collectNumericLeaves(
   value: unknown,
-  path: string[] = []
+  path: string[] = [],
 ): Array<{ path: string; value: number }> {
   if (typeof value === "number") {
     return [{ path: path.join("."), value }];
@@ -81,7 +75,7 @@ function collectNumericLeaves(
   }
 
   return Object.entries(value).flatMap(([key, child]) =>
-    collectNumericLeaves(child, [...path, key])
+    collectNumericLeaves(child, [...path, key]),
   );
 }
 
@@ -102,7 +96,7 @@ function sectionBlockHasComment(sourceText: string, section: string): boolean {
   }
 
   const rest = sourceText.slice(start + section.length + 3);
-  const nextSection = rest.search(/\n  [a-zA-Z][a-zA-Z0-9]*:/);
+  const nextSection = rest.search(/\n {2}[a-zA-Z][a-zA-Z0-9]*:/);
   const sectionBlock = nextSection >= 0 ? rest.slice(0, nextSection) : rest;
   return sectionBlock.includes("//");
 }

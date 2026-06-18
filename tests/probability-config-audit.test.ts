@@ -1,6 +1,6 @@
 import {
   auditProbabilityConfig,
-  auditProbabilityConfigSource
+  auditProbabilityConfigSource,
 } from "../src/harness/probability-config-audit";
 
 describe("auditProbabilityConfig", () => {
@@ -19,8 +19,8 @@ describe("auditProbabilityConfig", () => {
     const audit = auditProbabilityConfigSource(
       {
         hiring: {
-          baseAcceptance: 0.2
-        }
+          baseAcceptance: 0.2,
+        },
       },
       `
 export const PROBABILITY_CONFIG = {
@@ -29,7 +29,7 @@ export const PROBABILITY_CONFIG = {
     baseAcceptance: 0.2
   }
 } as const;
-`
+`,
     );
 
     expect(audit.missingRequiredSections).toContain("finance");

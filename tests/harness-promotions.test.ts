@@ -16,9 +16,9 @@ const promotableCandidate: Candidate = {
   background: {
     educationTier: "strong",
     major: "business",
-    industryExperienceYears: 7
+    industryExperienceYears: 7,
   },
-  personality: "steady"
+  personality: 5,
 };
 
 describe("harness promotions", () => {
@@ -32,7 +32,7 @@ describe("harness promotions", () => {
     const employee = hireEmployee(state, {
       candidate: promotableCandidate,
       salary: 24_000,
-      equityPercent: 0.1
+      equityPercent: 0.1,
     });
     employee.monthsTenure = 11;
 
@@ -41,7 +41,7 @@ describe("harness promotions", () => {
     expect(result.state.company.employees[0]?.monthsTenure).toBe(12);
     expect(result.state.company.employees[0]?.managementLevel).toBe("middle");
     expect(
-      result.state.eventLog.some((entry) => entry === "Promoted product to middle management")
+      result.state.eventLog.some((entry) => entry === "Promoted product to middle management"),
     ).toBe(true);
   });
 });

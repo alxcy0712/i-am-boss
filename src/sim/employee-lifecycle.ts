@@ -27,7 +27,7 @@ export function hireEmployee(state: GameState, input: HireEmployeeInput): Employ
     iq: input.candidate.iq,
     personality: input.candidate.personality,
     monthsTenure: 0,
-    managementLevel: "individual"
+    managementLevel: "individual",
   };
 
   state.company.employees.push(employee);
@@ -36,7 +36,7 @@ export function hireEmployee(state: GameState, input: HireEmployeeInput): Employ
   recordGameEvent(state, {
     type: "employee_hired",
     role: employee.role,
-    salary: input.salary
+    salary: input.salary,
   });
   return employee;
 }
@@ -50,15 +50,12 @@ export function runMonthlyPayroll(state: GameState): number {
   state.company.cash -= payroll;
   recordGameEvent(state, {
     type: "payroll_paid",
-    amount: payroll
+    amount: payroll,
   });
   return payroll;
 }
 
-export function advanceEmployeeTenure(
-  state: GameState,
-  input: { months: number }
-): void {
+export function advanceEmployeeTenure(state: GameState, input: { months: number }): void {
   for (const employee of state.company.employees) {
     employee.monthsTenure += input.months;
   }
@@ -80,14 +77,11 @@ export function processPromotions(state: GameState): EmployeeState[] {
   return promoted;
 }
 
-export function calculateSeverance(input: {
-  salary: number;
-  monthsTenure: number;
-}): number {
+export function calculateSeverance(input: { salary: number; monthsTenure: number }): number {
   const serviceYears = Math.ceil(input.monthsTenure / 12);
   const severanceMonths = Math.max(
     PROBABILITY_CONFIG.employeeLifecycle.minimumSeveranceMonths,
-    serviceYears * PROBABILITY_CONFIG.employeeLifecycle.severanceMonthsPerServiceYear
+    serviceYears * PROBABILITY_CONFIG.employeeLifecycle.severanceMonthsPerServiceYear,
   );
   return input.salary * severanceMonths;
 }
@@ -100,7 +94,7 @@ export function terminateEmployee(state: GameState, employeeId: string): number 
 
   const severance = calculateSeverance({
     salary: employee.salary,
-    monthsTenure: employee.monthsTenure
+    monthsTenure: employee.monthsTenure,
   });
   state.company.employees = state.company.employees.filter((item) => item.id !== employeeId);
   state.company.headcount -= 1;
@@ -109,7 +103,7 @@ export function terminateEmployee(state: GameState, employeeId: string): number 
   recordGameEvent(state, {
     type: "employee_terminated",
     role: employee.role,
-    severance
+    severance,
   });
   return severance;
 }
@@ -123,7 +117,7 @@ export interface SalaryAdjustmentResult {
 
 export function raiseEmployeeSalary(
   state: GameState,
-  input: { employeeId: string; salary?: number }
+  input: { employeeId: string; salary?: number },
 ): SalaryAdjustmentResult | undefined {
   const employee = state.company.employees.find((item) => item.id === input.employeeId);
   if (!employee) {
@@ -132,7 +126,7 @@ export function raiseEmployeeSalary(
 
   const previousSalary = employee.salary;
   const defaultSalary = Math.round(
-    previousSalary * (1 + PROBABILITY_CONFIG.employeeLifecycle.salaryRaiseRate)
+    previousSalary * (1 + PROBABILITY_CONFIG.employeeLifecycle.salaryRaiseRate),
   );
   const salary = Math.max(previousSalary, Math.round(input.salary ?? defaultSalary));
   const delta = salary - previousSalary;
@@ -142,7 +136,7 @@ export function raiseEmployeeSalary(
       employee,
       previousSalary,
       salary,
-      delta
+      delta,
     };
   }
 
@@ -152,21 +146,18 @@ export function raiseEmployeeSalary(
     type: "employee_salary_adjusted",
     role: employee.role,
     previousSalary,
-    salary
+    salary,
   });
 
   return {
     employee,
     previousSalary,
     salary,
-    delta
+    delta,
   };
 }
 
-export function processResignations(
-  state: GameState,
-  input: { seed: number }
-): EmployeeState[] {
+export function processResignations(state: GameState, input: { seed: number }): EmployeeState[] {
   const rng = createSeededRng(input.seed);
   const resigned: EmployeeState[] = [];
 
@@ -178,7 +169,7 @@ export function processResignations(
       culturePressure: state.company.culturePressure,
       morale: state.company.morale,
       culture: state.company.culture,
-      personality: employee.personality
+      personality: employee.personality,
     });
 
     if (risk > rng.next()) {
@@ -189,13 +180,13 @@ export function processResignations(
   if (resigned.length > 0) {
     const resignedIds = new Set(resigned.map((employee) => employee.id));
     state.company.employees = state.company.employees.filter(
-      (employee) => !resignedIds.has(employee.id)
+      (employee) => !resignedIds.has(employee.id),
     );
     state.company.headcount -= resigned.length;
     state.company.monthlyBurn -= resigned.reduce((total, employee) => total + employee.salary, 0);
     recordGameEvent(state, {
       type: "employees_resigned",
-      count: resigned.length
+      count: resigned.length,
     });
   }
 
@@ -204,7 +195,7 @@ export function processResignations(
 
 function getNextManagementLevel(
   state: GameState,
-  employee: EmployeeState
+  employee: EmployeeState,
 ): ManagementLevel | undefined {
   const config = PROBABILITY_CONFIG.promotion;
   const score = calculatePromotionScore(employee);
@@ -247,16 +238,19 @@ function calculatePromotionScore(employee: EmployeeState): number {
 function promoteEmployee(
   state: GameState,
   employee: EmployeeState,
-  nextLevel: ManagementLevel
+  nextLevel: ManagementLevel,
 ): void {
   const raise = Math.round(employee.salary * PROBABILITY_CONFIG.promotion.salaryRaiseRate);
   employee.salary += raise;
   employee.managementLevel = nextLevel;
   state.company.monthlyBurn += raise;
-  state.company.morale = Math.min(10, state.company.morale + PROBABILITY_CONFIG.promotion.moraleGain);
+  state.company.morale = Math.min(
+    10,
+    state.company.morale + PROBABILITY_CONFIG.promotion.moraleGain,
+  );
   recordGameEvent(state, {
     type: "employee_promoted",
     role: employee.role,
-    managementLevel: nextLevel
+    managementLevel: nextLevel,
   });
 }

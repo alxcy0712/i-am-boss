@@ -6,13 +6,13 @@ describe("runFastForward", () => {
       seed: 5,
       days: 3650,
       initialChoiceId: "technical-founder",
-      maxEventLogEntries: 12
+      maxEventLogEntries: 12,
     });
     const second = runFastForward({
       seed: 5,
       days: 3650,
       initialChoiceId: "technical-founder",
-      maxEventLogEntries: 12
+      maxEventLogEntries: 12,
     });
 
     expect(second.summary).toEqual(first.summary);

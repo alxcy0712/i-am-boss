@@ -3,13 +3,14 @@ import type {
   CompanyCulture,
   CompanyRole,
   EducationTier,
-  EmployeePersonality,
+  EmployeePersonalityType,
   GameEvent,
   GameEventCategory,
   GameEventSeverity,
   MacroCyclePhase,
-  ManagementLevel
+  ManagementLevel,
 } from "../sim/types";
+import { resolvePersonalityLabel } from "../sim/culture-fit";
 import type { WebStage } from "./screen";
 
 export type WebLanguage = "zh-CN" | "en";
@@ -78,7 +79,7 @@ interface LanguageText {
   actionLabels: Record<string, string>;
   roles: Record<CompanyRole, string>;
   seniorities: Record<string, string>;
-  personalities: Record<EmployeePersonality, string>;
+  personalities: Record<EmployeePersonalityType, string>;
   educationTiers: Record<EducationTier, string>;
   majors: Record<CandidateMajor, string>;
   cultures: Record<CompanyCulture, string>;
@@ -94,6 +95,15 @@ interface LanguageText {
   nextCandidate: string;
   monthsSuffix: string;
   yearsIndustry: (years: number) => string;
+  gameOverTitle: string;
+  gameOverReasons: Record<string, string>;
+  gameOverScoreBreakdownLabels: Record<string, string>;
+  gameOverSummaryLabels: Record<string, string>;
+  playAgainLabel: string;
+  leaderboardTitle: string;
+  leaderboardHeaders: Record<string, string>;
+  viewLeaderboardLabel: string;
+  noLeaderboardEntries: string;
 }
 
 export const DEFAULT_WEB_LANGUAGE: WebLanguage = "zh-CN";
@@ -143,24 +153,25 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       loanPrefix: "贷款",
       perMonthSuffix: "/月",
       languageToggleAria: "语言",
-      eventFilterAria: "事件筛选"
+      eventFilterAria: "事件筛选",
     },
     stageLabels: {
       startup: "创业准备",
       operating: "经营中",
-      "game-over": "游戏结束"
+      "game-over": "游戏结束",
+      leaderboard: "排行榜",
     },
     statusBadges: {
       startup: "创业准备",
       operating: "经营中",
       bankruptcy: "破产",
       retirement: "退休",
-      death: "创始人去世"
+      death: "创始人去世",
     },
     initialChoices: {
       "technical-founder": "技术型创始人",
       "network-founder": "人脉型创始人",
-      "resilient-founder": "抗压型创始人"
+      "resilient-founder": "抗压型创始人",
     },
     abilities: {
       technical: "技术",
@@ -168,11 +179,11 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       stressTolerance: "抗压",
       communication: "沟通",
       eq: "情商",
-      iq: "智商"
+      iq: "智商",
     },
     companyBonuses: {
       cash: "现金",
-      reputation: "知名度"
+      reputation: "知名度",
     },
     hudLabels: {
       cash: "现金",
@@ -183,7 +194,7 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       morale: "士气",
       reputation: "知名度",
       pressure: "压力",
-      cycle: "周期"
+      cycle: "周期",
     },
     mapZones: {
       company: "公司",
@@ -191,7 +202,7 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       exchange: "交易所",
       "labor-market": "劳动力市场",
       court: "法院",
-      "policy-office": "政策办公室"
+      "policy-office": "政策办公室",
     },
     actionLabels: {
       "advance-30-days": "推进 30 天",
@@ -201,31 +212,41 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       "prepare-ipo": "准备 IPO",
       "change-culture": "切换公司文化",
       "terminate-employee": "解雇员工",
-      "raise-employee-salary": "员工加薪"
+      "raise-employee-salary": "员工加薪",
+      "toggle-ai-hiring": "切换 AI 招聘",
+      "run-ai-hiring-cycle": "运行 AI 招聘周期",
+      "purchase-insurance": "购买保险",
+      "file-insurance-claim": "提交保险理赔",
+      "make-investment": "进行投资",
+      "sell-investment": "出售投资",
+      "buy-car": "购买汽车",
+      "upgrade-car": "升级汽车",
+      "get-married": "结婚",
+      "have-child": "生子",
     },
     roles: {
       engineer: "工程师",
       product: "产品",
       sales: "销售",
       finance: "财务",
-      hr: "人力"
+      hr: "人力",
     },
     seniorities: {
       junior: "初级",
       mid: "中级",
-      senior: "高级"
+      senior: "高级",
     },
     personalities: {
       ambitious: "进取型",
       steady: "稳健型",
       collaborative: "协作型",
-      independent: "独立型"
+      independent: "独立型",
     },
     educationTiers: {
       elite: "顶尖院校",
       strong: "强校",
       standard: "普通院校",
-      vocational: "职业院校"
+      vocational: "职业院校",
     },
     majors: {
       "computer-science": "计算机科学",
@@ -233,38 +254,39 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       business: "商业",
       finance: "金融",
       design: "设计",
-      operations: "运营"
+      operations: "运营",
     },
     cultures: {
       wolf: "狼性文化",
       "laissez-faire": "无为而治",
       adaptive: "适应型文化",
-      striver: "奋斗精神"
+      striver: "奋斗精神",
     },
     managementLevels: {
       individual: "个人贡献者",
       middle: "中层",
-      executive: "高管"
+      executive: "高管",
     },
     cyclePhases: {
       recovery: "复苏",
       prosperity: "繁荣",
       recession: "衰退",
-      depression: "萧条"
+      depression: "萧条",
     },
     financeRequirements: {
       "annual-revenue": "年收入",
       reputation: "知名度",
-      headcount: "人数"
+      headcount: "人数",
+      "operational-capability": "运营能力",
     },
     valuationSources: {
       "analyst-estimate": "分析师估值",
-      "listed-market": "公开市场"
+      "listed-market": "公开市场",
     },
     ipoStatuses: {
       listed: "已上市公司",
       ready: "IPO 已就绪",
-      unmet: "IPO 条件不足"
+      unmet: "IPO 条件不足",
     },
     eventCategories: {
       founder: "创始人",
@@ -273,19 +295,51 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       market: "市场",
       society: "社会",
       legal: "法律",
-      operations: "运营"
+      operations: "运营",
     },
     eventSeverities: {
       info: "信息",
       positive: "正向",
       warning: "警告",
-      critical: "危急"
+      critical: "危急",
     },
     eventAllLabel: "全部",
     offerSuffix: "报价",
     nextCandidate: "下一位候选人",
     monthsSuffix: "个月",
-    yearsIndustry: (years) => `${years}年行业经验`
+    yearsIndustry: (years) => `${years}年行业经验`,
+    gameOverTitle: "游戏结束",
+    gameOverReasons: {
+      bankruptcy: "破产",
+      retirement: "退休",
+      death: "创始人去世",
+    },
+    gameOverScoreBreakdownLabels: {
+      daysPlayed: "经营天数",
+      companyValuation: "公司估值",
+      playerWealth: "创始人身价",
+    },
+    gameOverSummaryLabels: {
+      reason: "结束原因",
+      scoreBreakdown: "得分明细",
+      summary: "经营总结",
+      daysSurvived: "存活天数",
+      finalHeadcount: "最终人数",
+      culture: "公司文化",
+    },
+    playAgainLabel: "再来一局",
+    leaderboardTitle: "排行榜",
+    leaderboardHeaders: {
+      rank: "排名",
+      score: "得分",
+      daysPlayed: "经营天数",
+      companyValuation: "公司估值",
+      playerWealth: "创始人身价",
+      gameOverReason: "结束原因",
+      date: "日期",
+    },
+    viewLeaderboardLabel: "查看排行榜",
+    noLeaderboardEntries: "暂无记录",
   },
   en: {
     languageLabel: "English",
@@ -331,24 +385,25 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       loanPrefix: "Loan",
       perMonthSuffix: "/mo",
       languageToggleAria: "Language",
-      eventFilterAria: "Event filters"
+      eventFilterAria: "Event filters",
     },
     stageLabels: {
       startup: "startup",
       operating: "operating",
-      "game-over": "game-over"
+      "game-over": "game-over",
+      leaderboard: "leaderboard",
     },
     statusBadges: {
       startup: "startup",
       operating: "operating",
       bankruptcy: "bankruptcy",
       retirement: "retirement",
-      death: "death"
+      death: "death",
     },
     initialChoices: {
       "technical-founder": "Technical Founder",
       "network-founder": "Network Founder",
-      "resilient-founder": "Resilient Founder"
+      "resilient-founder": "Resilient Founder",
     },
     abilities: {
       technical: "Technical",
@@ -356,11 +411,11 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       stressTolerance: "Stress",
       communication: "Communication",
       eq: "EQ",
-      iq: "IQ"
+      iq: "IQ",
     },
     companyBonuses: {
       cash: "cash",
-      reputation: "reputation"
+      reputation: "reputation",
     },
     hudLabels: {
       cash: "Cash",
@@ -371,7 +426,7 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       morale: "Morale",
       reputation: "Reputation",
       pressure: "Pressure",
-      cycle: "Cycle"
+      cycle: "Cycle",
     },
     mapZones: {
       company: "Company",
@@ -379,7 +434,7 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       exchange: "Exchange",
       "labor-market": "Labor Market",
       court: "Court",
-      "policy-office": "Policy Office"
+      "policy-office": "Policy Office",
     },
     actionLabels: {
       "advance-30-days": "Advance 30 Days",
@@ -389,31 +444,41 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       "prepare-ipo": "Prepare IPO",
       "change-culture": "Change Culture",
       "terminate-employee": "Terminate Employee",
-      "raise-employee-salary": "Raise Salary"
+      "raise-employee-salary": "Raise Salary",
+      "toggle-ai-hiring": "Toggle AI Hiring",
+      "run-ai-hiring-cycle": "Run AI Hiring Cycle",
+      "purchase-insurance": "Purchase Insurance",
+      "file-insurance-claim": "File Insurance Claim",
+      "make-investment": "Make Investment",
+      "sell-investment": "Sell Investment",
+      "buy-car": "Buy Car",
+      "upgrade-car": "Upgrade Car",
+      "get-married": "Get Married",
+      "have-child": "Have Child",
     },
     roles: {
       engineer: "engineer",
       product: "product",
       sales: "sales",
       finance: "finance",
-      hr: "hr"
+      hr: "hr",
     },
     seniorities: {
       junior: "junior",
       mid: "mid",
-      senior: "senior"
+      senior: "senior",
     },
     personalities: {
       ambitious: "ambitious",
       steady: "steady",
       collaborative: "collaborative",
-      independent: "independent"
+      independent: "independent",
     },
     educationTiers: {
       elite: "elite",
       strong: "strong",
       standard: "standard",
-      vocational: "vocational"
+      vocational: "vocational",
     },
     majors: {
       "computer-science": "computer-science",
@@ -421,38 +486,39 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       business: "business",
       finance: "finance",
       design: "design",
-      operations: "operations"
+      operations: "operations",
     },
     cultures: {
       wolf: "wolf",
       "laissez-faire": "laissez-faire",
       adaptive: "adaptive",
-      striver: "striver"
+      striver: "striver",
     },
     managementLevels: {
       individual: "individual",
       middle: "middle",
-      executive: "executive"
+      executive: "executive",
     },
     cyclePhases: {
       recovery: "recovery",
       prosperity: "prosperity",
       recession: "recession",
-      depression: "depression"
+      depression: "depression",
     },
     financeRequirements: {
       "annual-revenue": "Annual revenue",
       reputation: "Reputation",
-      headcount: "Headcount"
+      headcount: "Headcount",
+      "operational-capability": "Operational capability",
     },
     valuationSources: {
       "analyst-estimate": "Analyst estimate",
-      "listed-market": "Public market"
+      "listed-market": "Public market",
     },
     ipoStatuses: {
       listed: "Listed company",
       ready: "IPO ready",
-      unmet: "IPO requirements unmet"
+      unmet: "IPO requirements unmet",
     },
     eventCategories: {
       founder: "FOUNDER",
@@ -461,20 +527,52 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       market: "MARKET",
       society: "SOCIETY",
       legal: "LEGAL",
-      operations: "OPS"
+      operations: "OPS",
     },
     eventSeverities: {
       info: "INFO",
       positive: "POSITIVE",
       warning: "WARNING",
-      critical: "CRITICAL"
+      critical: "CRITICAL",
     },
     eventAllLabel: "ALL",
     offerSuffix: "offer",
     nextCandidate: "Next candidate",
     monthsSuffix: "months",
-    yearsIndustry: (years) => `${years}y industry`
-  }
+    yearsIndustry: (years) => `${years}y industry`,
+    gameOverTitle: "GAME OVER",
+    gameOverReasons: {
+      bankruptcy: "Bankruptcy",
+      retirement: "Retirement",
+      death: "Founder Death",
+    },
+    gameOverScoreBreakdownLabels: {
+      daysPlayed: "Days Played",
+      companyValuation: "Company Valuation",
+      playerWealth: "Player Wealth",
+    },
+    gameOverSummaryLabels: {
+      reason: "Cause",
+      scoreBreakdown: "Score Breakdown",
+      summary: "Summary",
+      daysSurvived: "Days Survived",
+      finalHeadcount: "Final Headcount",
+      culture: "Company Culture",
+    },
+    playAgainLabel: "Play Again",
+    leaderboardTitle: "LEADERBOARD",
+    leaderboardHeaders: {
+      rank: "Rank",
+      score: "Score",
+      daysPlayed: "Days",
+      companyValuation: "Valuation",
+      playerWealth: "Wealth",
+      gameOverReason: "Cause",
+      date: "Date",
+    },
+    viewLeaderboardLabel: "View Leaderboard",
+    noLeaderboardEntries: "No entries yet",
+  },
 };
 
 export function resolveWebLanguage(language?: string): WebLanguage {
@@ -485,7 +583,7 @@ export function createLanguageOptions(selected: WebLanguage): WebLanguageOption[
   return (Object.keys(TEXT) as WebLanguage[]).map((id) => ({
     id,
     label: TEXT[id].languageLabel,
-    selected: id === selected
+    selected: id === selected,
   }));
 }
 
@@ -512,7 +610,7 @@ export function getStartupEvent(language: WebLanguage): string {
 export function translateInitialChoiceLabel(
   id: string,
   fallback: string,
-  language: WebLanguage
+  language: WebLanguage,
 ): string {
   return TEXT[language].initialChoices[id] ?? fallback;
 }
@@ -523,7 +621,7 @@ export function translateAbilityLabel(key: string, language: WebLanguage): strin
 
 export function translateCompanyBonusLabel(
   key: "cash" | "reputation",
-  language: WebLanguage
+  language: WebLanguage,
 ): string {
   return TEXT[language].companyBonuses[key];
 }
@@ -548,11 +646,9 @@ export function translateSeniority(seniority: string, language: WebLanguage): st
   return TEXT[language].seniorities[seniority] ?? seniority;
 }
 
-export function translatePersonality(
-  personality: EmployeePersonality,
-  language: WebLanguage
-): string {
-  return TEXT[language].personalities[personality];
+export function translatePersonality(personality: number, language: WebLanguage): string {
+  const label = resolvePersonalityLabel(personality) as EmployeePersonalityType;
+  return TEXT[language].personalities[label];
 }
 
 export function translateEducationTier(tier: EducationTier, language: WebLanguage): string {
@@ -578,36 +674,30 @@ export function translateManagementLevel(level: ManagementLevel, language: WebLa
 export function translateFinanceRequirementLabel(
   id: string,
   fallback: string,
-  language: WebLanguage
+  language: WebLanguage,
 ): string {
   return TEXT[language].financeRequirements[id] ?? fallback;
 }
 
 export function translateValuationSource(
   source: "analyst-estimate" | "listed-market",
-  language: WebLanguage
+  language: WebLanguage,
 ): string {
   return TEXT[language].valuationSources[source];
 }
 
 export function translateIpoStatus(
   status: "listed" | "ready" | "unmet",
-  language: WebLanguage
+  language: WebLanguage,
 ): string {
   return TEXT[language].ipoStatuses[status];
 }
 
-export function translateEventCategory(
-  category: GameEventCategory,
-  language: WebLanguage
-): string {
+export function translateEventCategory(category: GameEventCategory, language: WebLanguage): string {
   return TEXT[language].eventCategories[category];
 }
 
-export function translateEventSeverity(
-  severity: GameEventSeverity,
-  language: WebLanguage
-): string {
+export function translateEventSeverity(severity: GameEventSeverity, language: WebLanguage): string {
   return TEXT[language].eventSeverities[severity];
 }
 
@@ -637,6 +727,42 @@ export function translateStatusBadge(status: string, language: WebLanguage): str
   return TEXT[language].statusBadges[status] ?? status;
 }
 
+export function translateGameOverTitle(language: WebLanguage): string {
+  return TEXT[language].gameOverTitle;
+}
+
+export function translateGameOverReasonLabel(reason: string, language: WebLanguage): string {
+  return TEXT[language].gameOverReasons[reason] ?? reason;
+}
+
+export function translateGameOverScoreBreakdownLabel(key: string, language: WebLanguage): string {
+  return TEXT[language].gameOverScoreBreakdownLabels[key] ?? key;
+}
+
+export function translateGameOverSummaryLabel(key: string, language: WebLanguage): string {
+  return TEXT[language].gameOverSummaryLabels[key] ?? key;
+}
+
+export function translatePlayAgainLabel(language: WebLanguage): string {
+  return TEXT[language].playAgainLabel;
+}
+
+export function translateLeaderboardTitle(language: WebLanguage): string {
+  return TEXT[language].leaderboardTitle;
+}
+
+export function translateLeaderboardHeader(key: string, language: WebLanguage): string {
+  return TEXT[language].leaderboardHeaders[key] ?? key;
+}
+
+export function translateViewLeaderboardLabel(language: WebLanguage): string {
+  return TEXT[language].viewLeaderboardLabel;
+}
+
+export function translateNoLeaderboardEntries(language: WebLanguage): string {
+  return TEXT[language].noLeaderboardEntries;
+}
+
 export function translateDisplayValue(value: string, language: WebLanguage): string {
   if (language === "en") {
     return value;
@@ -663,7 +789,7 @@ export function translateEvent(event: GameEvent, language: WebLanguage): string 
       return `初始选择：${translateInitialChoiceLabel(
         event.choiceId,
         event.choiceLabel,
-        language
+        language,
       )}`;
     case "bank_loan_approved":
       return `银行贷款获批：${formatCurrency(event.amount)}`;
@@ -679,7 +805,7 @@ export function translateEvent(event: GameEvent, language: WebLanguage): string 
       return `已招聘${translateRole(event.role, language)}：${formatCurrency(event.salary)}`;
     case "employee_salary_adjusted":
       return `已给${translateRole(event.role, language)}加薪：${formatCurrency(
-        event.previousSalary
+        event.previousSalary,
       )} -> ${formatCurrency(event.salary)}`;
     case "hiring_failed":
       return `招聘失败：${translateRole(event.role, language)}`;
@@ -687,14 +813,14 @@ export function translateEvent(event: GameEvent, language: WebLanguage): string 
       return `已发薪资：${formatCurrency(event.amount)}`;
     case "employee_terminated":
       return `已解雇${translateRole(event.role, language)}：赔偿 ${formatCurrency(
-        event.severance
+        event.severance,
       )}`;
     case "employees_resigned":
       return `员工离职：${event.count} 人`;
     case "employee_promoted":
       return `晋升${translateRole(event.role, language)}为${translateManagementLevel(
         event.managementLevel,
-        language
+        language,
       )}管理`;
     case "culture_changed":
       return `公司文化切换为：${translateCulture(event.culture, language)}`;
@@ -708,12 +834,40 @@ export function translateEvent(event: GameEvent, language: WebLanguage): string 
       }，罚款 ${formatCurrency(event.penalty)}`;
     case "society_event":
       return `${translateEventType(event.eventType)}：现金 ${formatCurrency(
-        event.cashDelta
+        event.cashDelta,
       )}，知名度 ${event.reputationDelta}`;
     case "special_event":
       return `特殊事件：${translateEventType(event.eventType)}，现金 ${formatCurrency(
-        event.cashDelta
+        event.cashDelta,
       )}，市场情绪 ${event.marketSentimentDelta}`;
+    case "car_purchased":
+      return `购买汽车：${event.brand}，${formatCurrency(event.value)}`;
+    case "car_upgraded":
+      return `升级汽车：${event.brand}，${formatCurrency(event.newValue)}`;
+    case "marriage":
+      return `结婚：${event.spouseName}`;
+    case "child_born":
+      return `孩子出生：${event.childName}`;
+    case "divorce":
+      return `离婚：${event.spouseName}，损失 ${formatCurrency(event.wealthLoss)}`;
+    case "ai_hire_succeeded":
+      return `AI 招聘成功：${translateRole(event.role, language)}，薪资 ${formatCurrency(event.salary)}`;
+    case "ai_hire_failed":
+      return `AI 招聘失败：${translateRole(event.role, language)}`;
+    case "insurance_purchased":
+      return `购买保险：${event.insuranceType}，保费 ${formatCurrency(event.premium)}`;
+    case "insurance_claim_paid":
+      return `保险理赔：赔付 ${formatCurrency(event.payout)}`;
+    case "investment_made":
+      return `投资：${event.investmentType}，金额 ${formatCurrency(event.amount)}`;
+    case "investment_return":
+      return `投资收益：${formatCurrency(event.returnAmount)}`;
+    case "investment_sold":
+      return `投资出售：${formatCurrency(event.saleAmount)}，收益 ${formatCurrency(event.gain)}`;
+    case "governance_penalty":
+      return `治理处罚：${event.reason}，罚款 ${formatCurrency(event.penalty)}`;
+    case "delisting_warning":
+      return `退市警告：${event.reasons.join("，")}`;
   }
 }
 
@@ -755,7 +909,7 @@ export function translateEventEntry(entry: string, language: WebLanguage): strin
   const hired = entry.match(/^Hired ([\w-]+)(?:: | for ¥)([\d,]+)$/);
   if (hired) {
     return `已招聘${translateRoleFromString(hired[1], language)}：${formatCurrency(
-      Number(hired[2].replaceAll(",", ""))
+      Number(hired[2].replaceAll(",", "")),
     )}`;
   }
 
@@ -778,7 +932,7 @@ export function translateEventEntry(entry: string, language: WebLanguage): strin
   if (promoted) {
     return `晋升${translateRoleFromString(promoted[1], language)}为${translateManagementLevelFromString(
       promoted[2],
-      language
+      language,
     )}管理`;
   }
 
@@ -806,14 +960,14 @@ export function translateEventEntry(entry: string, language: WebLanguage): strin
   const society = entry.match(/^([\w-]+): cash (-?\d+), reputation (-?\d+)/);
   if (society) {
     return `${translateEventType(society[1])}：现金 ${formatCurrency(
-      Number(society[2])
+      Number(society[2]),
     )}，知名度 ${society[3]}`;
   }
 
   const special = entry.match(/^Special event: ([\w-]+) cash (-?\d+), sentiment (-?[\d.]+)/);
   if (special) {
     return `特殊事件：${translateEventType(special[1])}，现金 ${formatCurrency(
-      Number(special[2])
+      Number(special[2]),
     )}，市场情绪 ${special[3]}`;
   }
 
@@ -838,7 +992,7 @@ function formatEnglishEvent(event: GameEvent): string {
       return `Hired ${event.role}: ${event.salary}`;
     case "employee_salary_adjusted":
       return `Raised ${event.role} salary: ${formatCurrency(
-        event.previousSalary
+        event.previousSalary,
       )} -> ${formatCurrency(event.salary)}`;
     case "hiring_failed":
       return event.reason
@@ -864,6 +1018,34 @@ function formatEnglishEvent(event: GameEvent): string {
       return `${event.eventType}: cash ${event.cashDelta}, reputation ${event.reputationDelta}`;
     case "special_event":
       return `Special event: ${event.eventType} cash ${event.cashDelta}, sentiment ${event.marketSentimentDelta}`;
+    case "car_purchased":
+      return `Purchased car: ${event.brand} for ${formatCurrency(event.value)}`;
+    case "car_upgraded":
+      return `Upgraded car: ${event.brand} to ${formatCurrency(event.newValue)}`;
+    case "marriage":
+      return `Married: ${event.spouseName}`;
+    case "child_born":
+      return `Child born: ${event.childName}`;
+    case "divorce":
+      return `Divorce: ${event.spouseName}, lost ${formatCurrency(event.wealthLoss)}`;
+    case "ai_hire_succeeded":
+      return `AI hired ${event.role}: ${event.salary}`;
+    case "ai_hire_failed":
+      return `AI hiring failed: ${event.role}`;
+    case "insurance_purchased":
+      return `Insurance purchased: ${event.insuranceType}, premium ${formatCurrency(event.premium)}`;
+    case "insurance_claim_paid":
+      return `Insurance claim paid: ${formatCurrency(event.payout)}`;
+    case "investment_made":
+      return `Investment made: ${event.investmentType}, ${formatCurrency(event.amount)}`;
+    case "investment_return":
+      return `Investment return: ${formatCurrency(event.returnAmount)}`;
+    case "investment_sold":
+      return `Investment sold: ${formatCurrency(event.saleAmount)}, gain ${formatCurrency(event.gain)}`;
+    case "governance_penalty":
+      return `Governance penalty: ${event.reason}, ${formatCurrency(event.penalty)}`;
+    case "delisting_warning":
+      return `Delisting warning: ${event.reasons.join(", ")}`;
   }
 }
 
@@ -887,7 +1069,7 @@ function translateEventType(type: string): string {
     labor_market_shift: "劳动力市场变化",
     financial_crisis: "金融危机",
     supply_chain_shock: "供应链冲击",
-    geopolitical_tension: "地缘风险"
+    geopolitical_tension: "地缘风险",
   };
 
   return labels[type] ?? type;
@@ -909,10 +1091,7 @@ function isCompanyRole(value: string): value is CompanyRole {
 
 function isCompanyCulture(value: string): value is CompanyCulture {
   return (
-    value === "wolf" ||
-    value === "laissez-faire" ||
-    value === "adaptive" ||
-    value === "striver"
+    value === "wolf" || value === "laissez-faire" || value === "adaptive" || value === "striver"
   );
 }
 

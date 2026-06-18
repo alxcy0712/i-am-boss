@@ -1,10 +1,5 @@
 import { PROBABILITY_CONFIG } from "../config/probabilities";
-import type {
-  CandidateBackground,
-  CandidateMajor,
-  CompanyRole,
-  EducationTier
-} from "./types";
+import type { CandidateBackground, CandidateMajor, CompanyRole } from "./types";
 import type { Candidate } from "./hiring";
 import { clamp, createSeededRng } from "./rng";
 
@@ -13,6 +8,7 @@ export type Seniority = "junior" | "mid" | "senior";
 export interface HiringPlanInput {
   headcount: number;
   annualRevenue: number;
+  resources?: number;
 }
 
 export interface CandidateInput {
@@ -36,13 +32,30 @@ export interface CandidateSalaryInput {
   background: CandidateBackground;
 }
 
+export interface AIHiringDecisionInput {
+  role: CompanyRole;
+  companyCash: number;
+  marketRate: number;
+}
+
+export interface AIHiringDecision {
+  targetSalaryMin: number;
+  targetSalaryMax: number;
+  equityPercent: number;
+  strategy: "aggressive" | "moderate" | "conservative";
+}
+
 export function getHiringPlan(input: HiringPlanInput): CompanyRole[] {
+  const resourceBoost = (input.resources ?? 5) >= 7;
+
   if (input.headcount < 5 && input.annualRevenue < 300_000) {
-    return ["engineer"];
+    return resourceBoost ? ["engineer", "product"] : ["engineer"];
   }
 
   if (input.headcount < 15) {
-    return ["engineer", "product", "sales"];
+    return resourceBoost
+      ? ["engineer", "product", "sales", "finance"]
+      : ["engineer", "product", "sales"];
   }
 
   return ["engineer", "product", "sales", "finance", "hr"];
@@ -65,30 +78,30 @@ export function generateCandidate(input: CandidateInput): Candidate {
     educationRoll: applyReputationRollShift(
       rng.next(),
       reputationFit,
-      PROBABILITY_CONFIG.candidateBackground.reputationEducationRollShift
+      PROBABILITY_CONFIG.candidateBackground.reputationEducationRollShift,
     ),
     majorRoll: applyReputationRollShift(
       rng.next(),
       reputationFit,
-      PROBABILITY_CONFIG.candidateBackground.reputationMajorRollShift
+      PROBABILITY_CONFIG.candidateBackground.reputationMajorRollShift,
     ),
     industryRoll: clamp(
       rng.next() +
         reputationFit * PROBABILITY_CONFIG.candidateBackground.reputationIndustryRollBoost,
       0,
-      0.999999
-    )
+      0.999999,
+    ),
   });
   const technical = clamp(
     Math.round(
       baseTechnical +
         calculateBackgroundTechnicalBonus({
           role: input.role,
-          background
-        })
+          background,
+        }),
     ),
     0,
-    10
+    10,
   );
   const targetSalary = calculateCandidateTargetSalary({
     role: input.role,
@@ -96,7 +109,7 @@ export function generateCandidate(input: CandidateInput): Candidate {
     technical,
     communication,
     iq,
-    background
+    background,
   });
 
   return {
@@ -110,7 +123,10 @@ export function generateCandidate(input: CandidateInput): Candidate {
     eq,
     iq,
     background,
-    personality: input.seniority === "senior" ? "ambitious" : "steady"
+    personality:
+      input.seniority === "senior"
+        ? clamp(Math.round(6 + rng.next() * 5), 6, 10)
+        : clamp(Math.round(3 + rng.next() * 5), 3, 7),
   };
 }
 
@@ -127,11 +143,11 @@ export function generateCandidateBackground(input: {
 }): CandidateBackground {
   const educationTier = selectWeightedKey(
     input.educationRoll,
-    PROBABILITY_CONFIG.candidateBackground.educationTierWeights
+    PROBABILITY_CONFIG.candidateBackground.educationTierWeights,
   );
   const major = selectWeightedKey(
     input.majorRoll,
-    PROBABILITY_CONFIG.candidateBackground.majorWeightsByRole[input.role]
+    PROBABILITY_CONFIG.candidateBackground.majorWeightsByRole[input.role],
   );
   const relevantExperienceShare = 0.5 + clamp(input.industryRoll, 0, 1) * 0.5;
 
@@ -140,14 +156,12 @@ export function generateCandidateBackground(input: {
     major,
     industryExperienceYears: Math.min(
       input.experienceYears,
-      Math.round(input.experienceYears * relevantExperienceShare)
-    )
+      Math.round(input.experienceYears * relevantExperienceShare),
+    ),
   };
 }
 
-export function calculateBackgroundTechnicalBonus(
-  input: BackgroundTechnicalBonusInput
-): number {
+export function calculateBackgroundTechnicalBonus(input: BackgroundTechnicalBonusInput): number {
   const config = PROBABILITY_CONFIG.candidateBackground;
   return (
     config.educationTechnicalBonus[input.background.educationTier] +
@@ -167,16 +181,11 @@ export function calculateCandidateTargetSalary(input: CandidateSalaryInput): num
   const backgroundMultiplier =
     1 +
     config.educationSalaryPremium[input.background.educationTier] +
-    (majorFitsRole(input.role, input.background.major)
-      ? config.roleMatchedMajorSalaryPremium
-      : 0) +
+    (majorFitsRole(input.role, input.background.major) ? config.roleMatchedMajorSalaryPremium : 0) +
     input.background.industryExperienceYears * config.industryExperienceSalaryWeight;
 
   return Math.round(
-    baseSalary *
-      seniorityMultiplier *
-      abilityMultiplier *
-      clamp(backgroundMultiplier, 0.8, 1.25)
+    baseSalary * seniorityMultiplier * abilityMultiplier * clamp(backgroundMultiplier, 0.8, 1.25),
   );
 }
 
@@ -202,8 +211,41 @@ function majorFitsRole(role: CompanyRole, major: CandidateMajor): boolean {
     product: ["computer-science", "business", "design"],
     sales: ["business", "operations"],
     finance: ["finance", "business"],
-    hr: ["business", "operations"]
+    hr: ["business", "operations"],
   };
 
   return roleMatchedMajors[role].includes(major);
+}
+
+export function getAIHiringDecision(input: AIHiringDecisionInput): AIHiringDecision {
+  const config = PROBABILITY_CONFIG.aiHiring;
+  const budgetRatio = input.companyCash / (input.marketRate * 12);
+  let strategy: AIHiringDecision["strategy"];
+
+  if (budgetRatio > 3) {
+    strategy = "aggressive";
+  } else if (budgetRatio > 1.5) {
+    strategy = "moderate";
+  } else {
+    strategy = "conservative";
+  }
+
+  const flexibilityMultiplier =
+    strategy === "aggressive"
+      ? 1 + config.salaryFlexibility
+      : strategy === "moderate"
+        ? 1
+        : 1 - config.salaryFlexibility;
+
+  return {
+    targetSalaryMin: Math.round(input.marketRate * 0.85),
+    targetSalaryMax: Math.round(input.marketRate * flexibilityMultiplier),
+    equityPercent:
+      strategy === "aggressive"
+        ? config.equityOfferRate
+        : strategy === "moderate"
+          ? config.equityOfferRate * 0.5
+          : 0,
+    strategy,
+  };
 }

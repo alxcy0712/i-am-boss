@@ -2,7 +2,7 @@ import {
   advanceSession,
   createGameSession,
   createSessionViewModel,
-  selectInitialChoice
+  selectInitialChoice,
 } from "../src/game/session";
 
 describe("game session", () => {
@@ -12,7 +12,7 @@ describe("game session", () => {
     expect(session.initialChoices.map((choice) => choice.id)).toEqual([
       "technical-founder",
       "network-founder",
-      "resilient-founder"
+      "resilient-founder",
     ]);
     expect(session.selectedInitialChoiceId).toBeUndefined();
   });
@@ -36,13 +36,11 @@ describe("game session", () => {
   it("creates a UI view model from the active session summary", () => {
     const session = advanceSession(
       selectInitialChoice(createGameSession({ seed: 12 }), "network-founder"),
-      120
+      120,
     );
     const viewModel = createSessionViewModel(session);
 
     expect(viewModel.title).toBe("我是老板 / I am boss");
-    expect(viewModel.mapLocations.find((item) => item.id === "labor-market")?.enabled).toBe(
-      true
-    );
+    expect(viewModel.mapLocations.find((item) => item.id === "labor-market")?.enabled).toBe(true);
   });
 });

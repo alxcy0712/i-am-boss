@@ -3,7 +3,7 @@ import type {
   CandidateBackground,
   CompanyCulture,
   CompanyRole,
-  EmployeePersonality
+  EmployeePersonality,
 } from "./types";
 import { PROBABILITY_CONFIG } from "../config/probabilities";
 import { clamp, createSeededRng } from "./rng";
@@ -46,7 +46,7 @@ export function negotiateHiring(input: HiringInput): HiringResult {
     return {
       accepted: false,
       acceptanceProbability: 0,
-      reason: "salary_below_minimum"
+      reason: "salary_below_minimum",
     };
   }
 
@@ -57,7 +57,7 @@ export function negotiateHiring(input: HiringInput): HiringResult {
   const cultureFit = input.companyCulture
     ? calculateCultureFit({
         culture: input.companyCulture,
-        personality: input.candidate.personality
+        personality: input.candidate.personality,
       })
     : 0;
   const acceptanceProbability = clamp(
@@ -68,7 +68,7 @@ export function negotiateHiring(input: HiringInput): HiringResult {
       communicationFit * PROBABILITY_CONFIG.hiring.communicationWeight +
       cultureFit * PROBABILITY_CONFIG.cultureFit.hiringAcceptanceWeight,
     0,
-    0.98
+    0.98,
   );
   const roll = createSeededRng(input.seed).next();
   const accepted = roll <= acceptanceProbability;
@@ -76,6 +76,6 @@ export function negotiateHiring(input: HiringInput): HiringResult {
   return {
     accepted,
     acceptanceProbability,
-    reason: accepted ? undefined : "probability_failed"
+    reason: accepted ? undefined : "probability_failed",
   };
 }

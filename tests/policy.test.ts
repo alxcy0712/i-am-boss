@@ -9,7 +9,7 @@ describe("evaluatePolicySupport", () => {
 
     const result = evaluatePolicySupport(state, {
       priorityIndustries: ["technology", "advanced-manufacturing"],
-      minimumReputation: 5
+      minimumReputation: 5,
     });
 
     expect(result.granted).toBe(true);
@@ -23,7 +23,7 @@ describe("evaluatePolicySupport", () => {
 
     const result = evaluatePolicySupport(state, {
       priorityIndustries: ["biotech"],
-      minimumReputation: 5
+      minimumReputation: 5,
     });
 
     expect(result.granted).toBe(false);

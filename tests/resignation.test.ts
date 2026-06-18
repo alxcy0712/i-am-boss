@@ -7,14 +7,14 @@ describe("calculateResignationRisk", () => {
       targetSalary: 15000,
       stressTolerance: 8,
       culturePressure: 3,
-      morale: 8
+      morale: 8,
     });
     const highPressureRisk = calculateResignationRisk({
       salary: 10000,
       targetSalary: 15000,
       stressTolerance: 3,
       culturePressure: 8,
-      morale: 4
+      morale: 4,
     });
 
     expect(highPressureRisk).toBeGreaterThan(lowPressureRisk);

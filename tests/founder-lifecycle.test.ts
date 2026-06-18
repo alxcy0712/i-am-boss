@@ -24,11 +24,11 @@ describe("advanceFounderLifecycle", () => {
   it("keeps resilient founders healthier under the same pressure", () => {
     const technical = createInitialGameState({
       seed: 1,
-      initialChoiceId: "technical-founder"
+      initialChoiceId: "technical-founder",
     });
     const resilient = createInitialGameState({
       seed: 1,
-      initialChoiceId: "resilient-founder"
+      initialChoiceId: "resilient-founder",
     });
     technical.company.culturePressure = 10;
     resilient.company.culturePressure = 10;

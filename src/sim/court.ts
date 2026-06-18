@@ -32,7 +32,7 @@ export function resolveCourtCase(state: GameState, input: CourtCaseInput): Court
     type: "court_case_resolved",
     caseType: input.type,
     caseSeverity: input.severity,
-    penalty
+    penalty,
   });
   return { penalty, reputationDelta, abstractSummary };
 }

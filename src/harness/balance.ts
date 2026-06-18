@@ -10,13 +10,13 @@ export function createBalanceCliReport(argv: string[] = process.argv): BalanceRe
     initialChoiceId: readFlag(argv, "initialChoiceId", "network-founder"),
     maxEventLogEntries: Number(readFlag(argv, "maxEventLogEntries", "8")),
     checkpointIntervalDays: readOptionalNumberFlag(argv, "checkpointIntervalDays"),
-    includeResults: !hasFlag(argv, "summaryOnly")
+    includeResults: !hasFlag(argv, "summaryOnly"),
   });
 }
 
 function readFlag(argv: string[], name: string, fallback: string): string {
   const flagIndex = argv.indexOf(`--${name}`);
-  return flagIndex >= 0 ? argv[flagIndex + 1] ?? fallback : fallback;
+  return flagIndex >= 0 ? (argv[flagIndex + 1] ?? fallback) : fallback;
 }
 
 function readOptionalNumberFlag(argv: string[], name: string): number | undefined {

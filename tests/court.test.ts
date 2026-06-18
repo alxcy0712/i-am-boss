@@ -9,7 +9,7 @@ describe("resolveCourtCase", () => {
 
     const result = resolveCourtCase(state, {
       type: "company_violation",
-      severity: 3
+      severity: 3,
     });
 
     expect(result.penalty).toBeGreaterThan(0);
@@ -23,7 +23,7 @@ describe("resolveCourtCase", () => {
 
     const result = resolveCourtCase(state, {
       type: "employee_violation",
-      severity: 2
+      severity: 2,
     });
 
     expect(result.abstractSummary).toContain("employee_violation");

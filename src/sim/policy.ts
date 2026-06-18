@@ -19,7 +19,7 @@ export function evaluatePolicySupport(state: GameState, input: PolicyInput): Pol
 
   if (!industryEligible || !reputationEligible) {
     recordGameEvent(state, {
-      type: "policy_support_ineligible"
+      type: "policy_support_ineligible",
     });
     return { granted: false, cashDelta: 0, reputationDelta: 0 };
   }
@@ -31,7 +31,7 @@ export function evaluatePolicySupport(state: GameState, input: PolicyInput): Pol
   state.society.policySupportCount += 1;
   recordGameEvent(state, {
     type: "policy_support_granted",
-    cashDelta
+    cashDelta,
   });
   return { granted: true, cashDelta, reputationDelta };
 }

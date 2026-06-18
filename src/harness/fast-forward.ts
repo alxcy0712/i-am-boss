@@ -28,9 +28,9 @@ export function runFastForward(input: FastForwardInput): FastForwardResult {
     summary: {
       ...summary,
       events: cappedEvents,
-      eventLog: cappedEventLog
+      eventLog: cappedEventLog,
     },
     elapsedMs: performance.now() - startedAt,
-    eventLogTruncated
+    eventLogTruncated,
   };
 }

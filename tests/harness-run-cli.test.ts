@@ -10,7 +10,7 @@ describe("createHarnessCliReport", () => {
       "--days",
       "30",
       "--initialChoiceId",
-      "technical-founder"
+      "technical-founder",
     ]);
 
     expect("checkpoints" in report).toBe(false);
@@ -32,7 +32,7 @@ describe("createHarnessCliReport", () => {
       "--initialChoiceId",
       "technical-founder",
       "--checkpointIntervalDays",
-      "90"
+      "90",
     ]);
 
     expect("checkpoints" in report).toBe(true);

@@ -3,6 +3,8 @@ import { recordGameEvent } from "./events";
 import type { GameState } from "./types";
 import { calculateCompanyValuation } from "./valuation";
 
+const FINANCE_CONFIG = PROBABILITY_CONFIG.finance;
+
 export interface LoanInput {
   requestedAmount: number;
 }
@@ -13,8 +15,11 @@ export interface FinanceResult {
 }
 
 export function applyBankLoan(state: GameState, input: LoanInput): FinanceResult {
-  const hasCredibility =
-    state.company.reputation >= PROBABILITY_CONFIG.finance.minimumLoanReputation;
+  const resourceBonus =
+    Math.max(0, state.company.resources - 3) * FINANCE_CONFIG.resourceLoanBonusRate;
+  const effectiveReputation = state.company.reputation + resourceBonus;
+
+  const hasCredibility = effectiveReputation >= FINANCE_CONFIG.minimumLoanReputation;
   const hasCashFlow = state.company.annualRevenue > state.company.monthlyBurn * 6;
 
   if (!hasCredibility || !hasCashFlow) {
@@ -25,7 +30,7 @@ export function applyBankLoan(state: GameState, input: LoanInput): FinanceResult
   state.company.debt += input.requestedAmount;
   recordGameEvent(state, {
     type: "bank_loan_approved",
-    amount: input.requestedAmount
+    amount: input.requestedAmount,
   });
   return { approved: true };
 }
@@ -36,9 +41,10 @@ export interface IpoInput {
 
 export function prepareIpo(state: GameState, input: IpoInput): FinanceResult {
   const eligible =
-    state.company.annualRevenue >= PROBABILITY_CONFIG.finance.ipoRevenueThreshold &&
-    state.company.reputation >= PROBABILITY_CONFIG.finance.ipoReputationThreshold &&
-    state.company.headcount >= PROBABILITY_CONFIG.finance.ipoHeadcountThreshold;
+    state.company.annualRevenue >= FINANCE_CONFIG.ipoRevenueThreshold &&
+    state.company.reputation >= FINANCE_CONFIG.ipoReputationThreshold &&
+    state.company.headcount >= FINANCE_CONFIG.ipoHeadcountThreshold &&
+    state.company.operationalCapability >= FINANCE_CONFIG.ipoOperationalCapabilityThreshold;
 
   if (!eligible) {
     return { approved: false, reason: "ipo_requirements_not_met" };
@@ -49,14 +55,15 @@ export function prepareIpo(state: GameState, input: IpoInput): FinanceResult {
     annualRevenue: state.company.annualRevenue,
     profitMargin: 0.18,
     reputation: state.company.reputation,
-    marketSentiment: input.marketSentiment
+    marketSentiment: input.marketSentiment,
+    operationalCapability: state.company.operationalCapability,
   });
 
   state.company.isPublic = true;
   state.company.listedMarketValue = valuation.value * 1.15;
   recordGameEvent(state, {
     type: "ipo_prepared",
-    listedMarketValue: state.company.listedMarketValue
+    listedMarketValue: state.company.listedMarketValue,
   });
   return { approved: true };
 }

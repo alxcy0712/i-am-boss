@@ -51,14 +51,14 @@ export function createGameViewModel(summary: HarnessSummary): GameViewModel {
       age: summary.founderAge,
       health: summary.founderHealth,
       wealth: summary.playerWealth,
-      abilities: summary.founderAbilities
+      abilities: summary.founderAbilities,
     },
     staff: {
       employeeCount: summary.employeeCount,
       roleCounts: summary.staffRoleCounts,
       totalMonthlyPayroll: summary.totalMonthlyPayroll,
       averageEmployeeSalary: summary.averageEmployeeSalary,
-      employees: summary.employees
+      employees: summary.employees,
     },
     hud: {
       cash: { label: "Cash", value: formatCurrency(summary.cash) },
@@ -69,10 +69,10 @@ export function createGameViewModel(summary: HarnessSummary): GameViewModel {
       morale: { label: "Morale", value: formatTenPointScore(summary.companyMorale) },
       reputation: {
         label: "Reputation",
-        value: formatTenPointScore(summary.companyReputation)
+        value: formatTenPointScore(summary.companyReputation),
       },
       pressure: { label: "Pressure", value: formatTenPointScore(summary.culturePressure) },
-      cycle: { label: "Cycle", value: summary.cyclePhase }
+      cycle: { label: "Cycle", value: summary.cyclePhase },
     },
     statusBadge: summary.gameOverReason ?? "operating",
     mapLocations: [
@@ -81,10 +81,10 @@ export function createGameViewModel(summary: HarnessSummary): GameViewModel {
       { id: "exchange", label: "Exchange", enabled: summary.companyValuation > 0 },
       { id: "labor-market", label: "Labor Market", enabled: true },
       { id: "court", label: "Court", enabled: true },
-      { id: "policy-office", label: "Policy Office", enabled: true }
+      { id: "policy-office", label: "Policy Office", enabled: true },
     ],
     events: summary.events.slice(-8),
-    eventFeed: summary.eventLog.slice(-8)
+    eventFeed: summary.eventLog.slice(-8),
   };
 }
 

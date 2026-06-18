@@ -8,7 +8,7 @@ export interface GameSnapshot {
 export function serializeGameState(state: GameState): string {
   const snapshot: GameSnapshot = {
     version: 1,
-    state
+    state,
   };
   return JSON.stringify(snapshot);
 }

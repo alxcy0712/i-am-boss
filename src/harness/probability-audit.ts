@@ -1,9 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  auditProbabilityConfig,
-  type ProbabilityConfigAudit
-} from "./probability-config-audit";
+import { auditProbabilityConfig, type ProbabilityConfigAudit } from "./probability-config-audit";
 
 export function createProbabilityAuditCliReport(): ProbabilityConfigAudit {
   return auditProbabilityConfig();

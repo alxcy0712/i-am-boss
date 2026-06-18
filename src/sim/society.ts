@@ -19,13 +19,13 @@ export function applySocietyEvent(state: GameState, event: SocietyEvent): void {
   state.company.reputation += event.reputationDelta;
   state.marketSentiment = Math.min(
     1.4,
-    Math.max(0.6, state.marketSentiment + (event.marketSentimentDelta ?? 0))
+    Math.max(0.6, state.marketSentiment + (event.marketSentimentDelta ?? 0)),
   );
   recordGameEvent(state, {
     type: "society_event",
     eventType: event.type,
     cashDelta: event.cashDelta,
     reputationDelta: event.reputationDelta,
-    marketSentimentDelta: event.marketSentimentDelta
+    marketSentimentDelta: event.marketSentimentDelta,
   });
 }

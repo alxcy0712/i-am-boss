@@ -8,7 +8,7 @@ describe("checkGameOver", () => {
 
     expect(checkGameOver(state)).toEqual({
       isGameOver: true,
-      reason: "bankruptcy"
+      reason: "bankruptcy",
     });
   });
 
@@ -18,7 +18,7 @@ describe("checkGameOver", () => {
 
     expect(checkGameOver(state)).toEqual({
       isGameOver: true,
-      reason: "retirement"
+      reason: "retirement",
     });
   });
 
@@ -28,7 +28,7 @@ describe("checkGameOver", () => {
 
     expect(checkGameOver(state)).toEqual({
       isGameOver: true,
-      reason: "death"
+      reason: "death",
     });
   });
 });

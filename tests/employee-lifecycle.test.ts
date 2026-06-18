@@ -3,7 +3,7 @@ import {
   hireEmployee,
   processResignations,
   runMonthlyPayroll,
-  terminateEmployee
+  terminateEmployee,
 } from "../src/sim/employee-lifecycle";
 import { generateCandidate } from "../src/sim/staffing";
 import { createInitialGameState } from "../src/sim/state";
@@ -17,7 +17,7 @@ describe("employee lifecycle", () => {
     const employee = hireEmployee(state, {
       candidate,
       salary: candidate.targetSalary,
-      equityPercent: 0.2
+      equityPercent: 0.2,
     });
 
     expect(state.company.employees).toHaveLength(1);

@@ -72,10 +72,7 @@ export interface EndingDistributionEntry {
   rate: number;
 }
 
-export type EndingDistribution = Record<
-  GameOverReason | "operating",
-  EndingDistributionEntry
->;
+export type EndingDistribution = Record<GameOverReason | "operating", EndingDistributionEntry>;
 
 export function runBalanceReport(input: BalanceReportInput): BalanceReport {
   if (input.checkpointIntervalDays && input.checkpointIntervalDays > 0) {
@@ -85,14 +82,14 @@ export function runBalanceReport(input: BalanceReportInput): BalanceReport {
         days: input.days,
         initialChoiceId: input.initialChoiceId,
         maxEventLogEntries: input.maxEventLogEntries,
-        checkpointIntervalDays: input.checkpointIntervalDays ?? input.days
-      })
+        checkpointIntervalDays: input.checkpointIntervalDays ?? input.days,
+      }),
     );
 
     return aggregateBalanceResults(
       input,
       timelineRuns.map((timelineRun) => timelineRun.result),
-      timelineRuns.map((timelineRun) => timelineRun.checkpoints)
+      timelineRuns.map((timelineRun) => timelineRun.checkpoints),
     );
   }
 
@@ -101,8 +98,8 @@ export function runBalanceReport(input: BalanceReportInput): BalanceReport {
       seed: input.seedStart + index,
       days: input.days,
       initialChoiceId: input.initialChoiceId,
-      maxEventLogEntries: input.maxEventLogEntries
-    })
+      maxEventLogEntries: input.maxEventLogEntries,
+    }),
   );
 
   return aggregateBalanceResults(input, results);
@@ -111,13 +108,10 @@ export function runBalanceReport(input: BalanceReportInput): BalanceReport {
 export function aggregateBalanceResults(
   input: BalanceReportInput,
   results: FastForwardResult[],
-  checkpointRuns: HarnessCheckpoint[][] = []
+  checkpointRuns: HarnessCheckpoint[][] = [],
 ): BalanceReport {
   const totalScore = results.reduce((total, result) => total + result.summary.score, 0);
-  const totalDays = results.reduce(
-    (total, result) => total + result.summary.daysPlayed,
-    0
-  );
+  const totalDays = results.reduce((total, result) => total + result.summary.daysPlayed, 0);
   const bankruptcyCount = countReason(results, "bankruptcy");
   const retirementCount = countReason(results, "retirement");
   const deathCount = countReason(results, "death");
@@ -127,17 +121,17 @@ export function aggregateBalanceResults(
     bankruptcyCount,
     retirementCount,
     deathCount,
-    operatingCount
+    operatingCount,
   });
   const publicMarket = createPublicMarketSummary({
     runs: input.runs,
-    results
+    results,
   });
   const eventSummary = createBalanceEventSummary(results);
   const performance = createBalancePerformance({
     runs: input.runs,
     totalDays,
-    results
+    results,
   });
   const checkpointSummaries = createCheckpointSummaries(checkpointRuns);
 
@@ -156,7 +150,7 @@ export function aggregateBalanceResults(
     publicMarket,
     eventSummary,
     performance,
-    eventLogTruncatedCount: results.filter((result) => result.eventLogTruncated).length
+    eventLogTruncatedCount: results.filter((result) => result.eventLogTruncated).length,
   };
 
   if (input.includeResults ?? true) {
@@ -184,16 +178,16 @@ function runBalanceTimeline(input: {
   const cappedSummary = capSummaryEventLog({
     summary: timeline.summary,
     maxEventLogEntries,
-    eventLogTruncated
+    eventLogTruncated,
   });
 
   return {
     result: {
       summary: cappedSummary,
       elapsedMs: performance.now() - startedAt,
-      eventLogTruncated
+      eventLogTruncated,
     },
-    checkpoints: timeline.checkpoints
+    checkpoints: timeline.checkpoints,
   };
 }
 
@@ -209,7 +203,7 @@ function capSummaryEventLog(input: {
       : input.summary.events,
     eventLog: input.eventLogTruncated
       ? input.summary.eventLog.slice(-input.maxEventLogEntries)
-      : input.summary.eventLog
+      : input.summary.eventLog,
   };
 }
 
@@ -223,14 +217,14 @@ function createBalanceEventSummary(results: FastForwardResult[]): GameEventSumma
       market: 0,
       society: 0,
       legal: 0,
-      operations: 0
+      operations: 0,
     },
     bySeverity: {
       info: 0,
       positive: 0,
       warning: 0,
-      critical: 0
-    }
+      critical: 0,
+    },
   };
 
   for (const result of results) {
@@ -267,7 +261,7 @@ function createEndingDistribution(input: {
     bankruptcy: entry(input.bankruptcyCount, input.runs),
     retirement: entry(input.retirementCount, input.runs),
     death: entry(input.deathCount, input.runs),
-    operating: entry(input.operatingCount, input.runs)
+    operating: entry(input.operatingCount, input.runs),
   };
 }
 
@@ -279,27 +273,20 @@ function createPublicMarketSummary(input: {
   const listedMarketValues = input.results
     .map((result) => result.summary.listedMarketValue)
     .filter((value): value is number => typeof value === "number");
-  const totalListedMarketValue = listedMarketValues.reduce(
-    (total, value) => total + value,
-    0
-  );
+  const totalListedMarketValue = listedMarketValues.reduce((total, value) => total + value, 0);
 
   return {
     publicCompanyCount,
     publicCompanyRate: input.runs === 0 ? 0 : publicCompanyCount / input.runs,
     averageListedMarketValue:
-      listedMarketValues.length === 0
-        ? 0
-        : totalListedMarketValue / listedMarketValues.length,
-    minimumListedMarketValue:
-      listedMarketValues.length === 0 ? 0 : Math.min(...listedMarketValues),
-    maximumListedMarketValue:
-      listedMarketValues.length === 0 ? 0 : Math.max(...listedMarketValues)
+      listedMarketValues.length === 0 ? 0 : totalListedMarketValue / listedMarketValues.length,
+    minimumListedMarketValue: listedMarketValues.length === 0 ? 0 : Math.min(...listedMarketValues),
+    maximumListedMarketValue: listedMarketValues.length === 0 ? 0 : Math.max(...listedMarketValues),
   };
 }
 
 function createCheckpointSummaries(
-  checkpointRuns: HarnessCheckpoint[][]
+  checkpointRuns: HarnessCheckpoint[][],
 ): BalanceCheckpointSummary[] {
   const checkpointsByDay = new Map<number, HarnessCheckpoint[]>();
 
@@ -317,30 +304,27 @@ function createCheckpointSummaries(
       const totalCash = checkpoints.reduce((total, checkpoint) => total + checkpoint.cash, 0);
       const totalCompanyValuation = checkpoints.reduce(
         (total, checkpoint) => total + checkpoint.companyValuation,
-        0
+        0,
       );
       const totalHeadcount = checkpoints.reduce(
         (total, checkpoint) => total + checkpoint.headcount,
-        0
+        0,
       );
       const totalDebt = checkpoints.reduce((total, checkpoint) => total + checkpoint.debt, 0);
       const totalCompanyReputation = checkpoints.reduce(
         (total, checkpoint) => total + checkpoint.companyReputation,
-        0
+        0,
       );
       const totalCompanyMorale = checkpoints.reduce(
         (total, checkpoint) => total + checkpoint.companyMorale,
-        0
+        0,
       );
       const negativeCashCount = checkpoints.filter((checkpoint) => checkpoint.cash < 0).length;
       const publicCompanyCount = checkpoints.filter((checkpoint) => checkpoint.isPublic).length;
       const listedMarketValues = checkpoints
         .map((checkpoint) => checkpoint.listedMarketValue)
         .filter((value): value is number => typeof value === "number");
-      const totalListedMarketValue = listedMarketValues.reduce(
-        (total, value) => total + value,
-        0
-      );
+      const totalListedMarketValue = listedMarketValues.reduce((total, value) => total + value, 0);
 
       return {
         day,
@@ -354,15 +338,13 @@ function createCheckpointSummaries(
         publicCompanyCount,
         publicCompanyRate: publicCompanyCount / checkpoints.length,
         averageListedMarketValue:
-          listedMarketValues.length === 0
-            ? 0
-            : totalListedMarketValue / listedMarketValues.length,
+          listedMarketValues.length === 0 ? 0 : totalListedMarketValue / listedMarketValues.length,
         averageCompanyReputation: totalCompanyReputation / checkpoints.length,
         averageCompanyMorale: totalCompanyMorale / checkpoints.length,
         gameOverCount: checkpoints.filter((checkpoint) => checkpoint.gameOverReason).length,
         bankruptcyCount: checkpoints.filter(
-          (checkpoint) => checkpoint.gameOverReason === "bankruptcy"
-        ).length
+          (checkpoint) => checkpoint.gameOverReason === "bankruptcy",
+        ).length,
       };
     });
 }
@@ -370,7 +352,7 @@ function createCheckpointSummaries(
 function entry(count: number, runs: number): EndingDistributionEntry {
   return {
     count,
-    rate: runs === 0 ? 0 : count / runs
+    rate: runs === 0 ? 0 : count / runs,
   };
 }
 
@@ -379,14 +361,11 @@ function createBalancePerformance(input: {
   totalDays: number;
   results: FastForwardResult[];
 }): BalancePerformance {
-  const totalElapsedMs = input.results.reduce(
-    (total, result) => total + result.elapsedMs,
-    0
-  );
+  const totalElapsedMs = input.results.reduce((total, result) => total + result.elapsedMs, 0);
 
   return {
     totalElapsedMs,
     averageElapsedMs: input.runs === 0 ? 0 : totalElapsedMs / input.runs,
-    simulatedDaysPerMs: totalElapsedMs === 0 ? 0 : input.totalDays / totalElapsedMs
+    simulatedDaysPerMs: totalElapsedMs === 0 ? 0 : input.totalDays / totalElapsedMs,
   };
 }

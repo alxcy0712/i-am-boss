@@ -13,7 +13,7 @@ export function createInitialGameState(input: {
     stressTolerance: 5,
     communication: 5,
     eq: 5,
-    iq: 5
+    iq: 5,
   };
 
   const state: GameState = {
@@ -28,10 +28,15 @@ export function createInitialGameState(input: {
         ...Object.fromEntries(
           Object.entries(choice.abilityBonus).map(([key, bonus]) => [
             key,
-            Math.min(10, baseAbilities[key as keyof typeof baseAbilities] + (bonus ?? 0))
-          ])
-        )
-      }
+            Math.min(10, baseAbilities[key as keyof typeof baseAbilities] + (bonus ?? 0)),
+          ]),
+        ),
+      },
+      personalLife: {
+        cars: [],
+        children: [],
+        happiness: 5,
+      },
     },
     company: {
       cash: 100000 + choice.companyBonus.cash,
@@ -46,7 +51,11 @@ export function createInitialGameState(input: {
       culturePressure: 5,
       headcount: 1,
       employees: [],
-      isPublic: false
+      isPublic: false,
+      resources: 5,
+      operationalCapability: 5,
+      insurancePolicies: [],
+      investments: [],
     },
     marketSentiment: 1,
     society: {
@@ -54,16 +63,16 @@ export function createInitialGameState(input: {
       unemploymentRate: 0.07,
       legalCaseCount: 0,
       policySupportCount: 0,
-      specialEventCount: 0
+      specialEventCount: 0,
     },
     events: [],
-    eventLog: []
+    eventLog: [],
   };
 
   recordGameEvent(state, {
     type: "initial_choice",
     choiceId: choice.id,
-    choiceLabel: choice.label
+    choiceLabel: choice.label,
   });
 
   return state;

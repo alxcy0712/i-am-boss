@@ -5,7 +5,10 @@ export type CompanyRoleCounts = Record<CompanyRole, number>;
 export type MacroCyclePhase = "recovery" | "prosperity" | "recession" | "depression";
 export type CompanyIndustry = "technology" | "advanced-manufacturing" | "biotech" | "services";
 export type ManagementLevel = "individual" | "middle" | "executive";
-export type EmployeePersonality = "ambitious" | "steady" | "collaborative" | "independent";
+/** Legacy enum personality labels for backward-compatible display. */
+export type EmployeePersonalityType = "ambitious" | "steady" | "collaborative" | "independent";
+/** Numeric personality score from 0 (steady) to 10 (independent). */
+export type EmployeePersonality = number;
 export type EducationTier = "elite" | "strong" | "standard" | "vocational";
 export type CandidateMajor =
   | "computer-science"
@@ -19,11 +22,10 @@ export type SocietyEventKind =
   | "legal_incident"
   | "market_shock"
   | "labor_market_shift";
-export type SpecialEventKind =
-  | "financial_crisis"
-  | "supply_chain_shock"
-  | "geopolitical_tension";
+export type SpecialEventKind = "financial_crisis" | "supply_chain_shock" | "geopolitical_tension";
 export type CourtCaseKind = "company_violation" | "employee_violation";
+export type InsuranceType = "legal" | "operational" | "market" | "comprehensive";
+export type InvestmentType = "stocks" | "bonds" | "real_estate" | "venture" | "crypto";
 export type GameEventCategory =
   | "founder"
   | "people"
@@ -33,6 +35,36 @@ export type GameEventCategory =
   | "legal"
   | "operations";
 export type GameEventSeverity = "info" | "positive" | "warning" | "critical";
+
+export type DelistingRiskLevel = "none" | "low" | "medium" | "high" | "critical";
+
+export interface GovernanceMetrics {
+  shareholderSatisfaction: number;
+  disclosureCompliance: number;
+  regulatoryCompliance: number;
+  overallScore: number;
+}
+
+export interface ShareholderResult {
+  satisfactionDelta: number;
+  reputationDelta: number;
+  valuationImpact: number;
+}
+
+export interface ComplianceResult {
+  isCompliant: boolean;
+  daysOverdue: number;
+  penalty: number;
+  reason?: string;
+}
+
+export interface DelistingRisk {
+  riskLevel: DelistingRiskLevel;
+  reasons: string[];
+  cashRisk: boolean;
+  reputationRisk: boolean;
+  valuationRisk: boolean;
+}
 
 export type GameEventPayload =
   | { type: "initial_choice"; choiceId: string; choiceLabel: string }
@@ -76,6 +108,31 @@ export type GameEventPayload =
   | { type: "ipo_prepared"; listedMarketValue: number }
   | { type: "hiring_failed"; role: CompanyRole; reason?: string }
   | { type: "candidate_skipped"; role: CompanyRole }
+  | { type: "ai_hire_succeeded"; role: CompanyRole; salary: number }
+  | { type: "ai_hire_failed"; role: CompanyRole; reason?: string }
+  | { type: "insurance_purchased"; insuranceType: InsuranceType; premium: number; coverage: number }
+  | { type: "insurance_claim_paid"; policyId: string; payout: number; damageAmount: number }
+  | {
+      type: "investment_made";
+      investmentType: InvestmentType;
+      amount: number;
+      expectedReturn: number;
+    }
+  | { type: "investment_return"; investmentId: string; returnAmount: number; currentValue: number }
+  | {
+      type: "investment_sold";
+      investmentId: string;
+      investmentType: InvestmentType;
+      saleAmount: number;
+      gain: number;
+    }
+  | { type: "governance_penalty"; reason: string; severityLevel: number; penalty: number }
+  | { type: "delisting_warning"; riskLevel: DelistingRiskLevel; reasons: string[] }
+  | { type: "car_purchased"; carId: string; brand: string; value: number }
+  | { type: "car_upgraded"; carId: string; brand: string; newValue: number }
+  | { type: "marriage"; spouseName: string }
+  | { type: "child_born"; childId: string; childName: string }
+  | { type: "divorce"; spouseName: string; wealthLoss: number }
   | { type: "game_over"; reason: GameOverReason };
 
 export type GameEvent = GameEventPayload & {
@@ -102,11 +159,42 @@ export interface AbilitySet {
   iq: number;
 }
 
+export interface Car {
+  id: string;
+  brand: string;
+  value: number;
+  maintenanceCost: number;
+  purchaseDate: number;
+}
+
+export interface Marriage {
+  spouseName: string;
+  marriageDate: number;
+  happiness: number;
+  divorceRisk: number;
+}
+
+export interface Child {
+  id: string;
+  name: string;
+  birthDate: number;
+  educationCost: number;
+  happiness: number;
+}
+
+export interface PersonalLife {
+  cars: Car[];
+  marriage?: Marriage;
+  children: Child[];
+  happiness: number;
+}
+
 export interface FounderState {
   age: number;
   health: number;
   wealth: number;
   abilities: AbilitySet;
+  personalLife: PersonalLife;
 }
 
 export interface CandidateBackground {
@@ -142,6 +230,14 @@ export interface CompanyState {
   employees: EmployeeState[];
   isPublic: boolean;
   listedMarketValue?: number;
+  /** Company resource level (0-10): infrastructure, tooling, and operational assets. */
+  resources: number;
+  /** Operational capability (0-10): process maturity and execution efficiency. */
+  operationalCapability: number;
+  insurancePolicies: InsurancePolicy[];
+  investments: Investment[];
+  governanceMetrics?: GovernanceMetrics;
+  lastDisclosureDay?: number;
 }
 
 export interface SocietyState {
@@ -171,4 +267,34 @@ export interface InitialChoice {
     cash: number;
     reputation: number;
   };
+}
+
+export interface InsurancePolicy {
+  id: string;
+  type: InsuranceType;
+  premium: number;
+  coverage: number;
+  deductible: number;
+  active: boolean;
+  startDate: number;
+}
+
+export interface RiskProfile {
+  riskScore: number;
+  factors: {
+    legalRisk: number;
+    operationalRisk: number;
+    marketRisk: number;
+  };
+  recommendations: string[];
+}
+
+export interface Investment {
+  id: string;
+  type: InvestmentType;
+  amount: number;
+  startDate: number;
+  expectedReturn: number;
+  riskLevel: number;
+  currentValue: number;
 }

@@ -7,7 +7,7 @@ describe("calculateCompanyValuation", () => {
       annualRevenue: 100,
       profitMargin: 0.2,
       reputation: 6,
-      marketSentiment: 1
+      marketSentiment: 1,
     });
 
     expect(valuation.kind).toBe("private_estimate");
@@ -21,12 +21,55 @@ describe("calculateCompanyValuation", () => {
       profitMargin: 0.2,
       reputation: 6,
       marketSentiment: 1,
-      listedMarketValue: 420
+      listedMarketValue: 420,
     });
 
     expect(valuation).toEqual({
       kind: "listed_market",
-      value: 420
+      value: 420,
     });
+  });
+
+  it("increases valuation with higher operational capability", () => {
+    const lowCapability = calculateCompanyValuation({
+      isPublic: false,
+      annualRevenue: 1_000_000,
+      profitMargin: 0.2,
+      reputation: 6,
+      marketSentiment: 1,
+      operationalCapability: 2,
+    });
+
+    const highCapability = calculateCompanyValuation({
+      isPublic: false,
+      annualRevenue: 1_000_000,
+      profitMargin: 0.2,
+      reputation: 6,
+      marketSentiment: 1,
+      operationalCapability: 9,
+    });
+
+    expect(highCapability.value).toBeGreaterThan(lowCapability.value);
+  });
+
+  it("defaults operational capability to 5 when not provided", () => {
+    const withDefault = calculateCompanyValuation({
+      isPublic: false,
+      annualRevenue: 1_000_000,
+      profitMargin: 0.2,
+      reputation: 6,
+      marketSentiment: 1,
+    });
+
+    const withExplicit = calculateCompanyValuation({
+      isPublic: false,
+      annualRevenue: 1_000_000,
+      profitMargin: 0.2,
+      reputation: 6,
+      marketSentiment: 1,
+      operationalCapability: 5,
+    });
+
+    expect(withDefault.value).toBe(withExplicit.value);
   });
 });

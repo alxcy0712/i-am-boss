@@ -2,16 +2,10 @@ import { generateCandidate, getHiringPlan } from "../src/sim/staffing";
 
 describe("getHiringPlan", () => {
   it("scales required roles from tiny startups to larger companies", () => {
-    expect(getHiringPlan({ headcount: 1, annualRevenue: 80000 })).toEqual([
-      "engineer"
-    ]);
+    expect(getHiringPlan({ headcount: 1, annualRevenue: 80000 })).toEqual(["engineer"]);
 
-    expect(getHiringPlan({ headcount: 25, annualRevenue: 1_200_000 })).toContain(
-      "finance"
-    );
-    expect(getHiringPlan({ headcount: 25, annualRevenue: 1_200_000 })).toContain(
-      "hr"
-    );
+    expect(getHiringPlan({ headcount: 25, annualRevenue: 1_200_000 })).toContain("finance");
+    expect(getHiringPlan({ headcount: 25, annualRevenue: 1_200_000 })).toContain("hr");
   });
 });
 

@@ -4,6 +4,34 @@ export interface ScoreInput {
   playerWealth: number;
 }
 
+export interface ScoreBreakdown {
+  daysPoints: number;
+  valuationPoints: number;
+  wealthPoints: number;
+  totalScore: number;
+}
+
+export function calculateScoreBreakdown(input: ScoreInput): ScoreBreakdown {
+  const daysPoints = input.daysPlayed * 1;
+  const valuationPoints = input.companyValuation * 2;
+  const wealthPoints = input.playerWealth * 1;
+  return {
+    daysPoints,
+    valuationPoints,
+    wealthPoints,
+    totalScore: daysPoints + valuationPoints + wealthPoints,
+  };
+}
+
 export function calculateFinalScore(input: ScoreInput): number {
-  return input.daysPlayed + input.companyValuation * 2 + input.playerWealth;
+  return calculateScoreBreakdown(input).totalScore;
+}
+
+/** Inverse of 1:2:1 formula: wealth = score - days - valuation*2 (clamped ≥ 0) */
+export function calculateWealthFromScore(
+  score: number,
+  daysPlayed: number,
+  companyValuation: number,
+): number {
+  return Math.max(0, score - daysPlayed - companyValuation * 2);
 }

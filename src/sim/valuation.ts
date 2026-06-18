@@ -9,6 +9,7 @@ export interface ValuationInput {
   reputation: number;
   marketSentiment: number;
   listedMarketValue?: number;
+  operationalCapability?: number;
 }
 
 export interface ValuationResult {
@@ -20,17 +21,22 @@ export function calculateCompanyValuation(input: ValuationInput): ValuationResul
   if (input.isPublic) {
     return {
       kind: "listed_market",
-      value: input.listedMarketValue ?? 0
+      value: input.listedMarketValue ?? 0,
     };
   }
+
+  const capabilityBonus =
+    ((input.operationalCapability ?? 5) / 10) *
+    PROBABILITY_CONFIG.companyResources.operationalCapabilityRevenueMultiplier;
 
   const multiple =
     PROBABILITY_CONFIG.valuation.privateRevenueMultiple +
     input.profitMargin * PROBABILITY_CONFIG.valuation.profitMarginWeight +
-    (input.reputation / 10) * PROBABILITY_CONFIG.valuation.reputationWeight;
+    (input.reputation / 10) * PROBABILITY_CONFIG.valuation.reputationWeight +
+    capabilityBonus;
 
   return {
     kind: "private_estimate",
-    value: input.annualRevenue * multiple * input.marketSentiment
+    value: input.annualRevenue * multiple * input.marketSentiment,
   };
 }

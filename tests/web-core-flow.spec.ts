@@ -23,26 +23,29 @@ test("plays the startup, recruitment, and time-advance browser flow", async ({ p
   await expect(page.locator(".market-board")).toContainText("Analyst estimate");
   await expect(page.locator(".market-board")).toContainText("1.00x");
   await expect(page.locator(".finance-panel")).toContainText("Loan ¥80,000");
-  await expect(page.locator("[data-ipo-requirement]")).toHaveCount(3);
+  await expect(page.locator("[data-ipo-requirement]")).toHaveCount(4);
   await expect(page.locator("[data-ipo-requirement='annual-revenue']")).toContainText("¥90,000");
   await expect(page.locator("[data-ipo-requirement='annual-revenue']")).toContainText("¥1,000,000");
+  await expect(page.locator("[data-ipo-requirement='operational-capability']")).toContainText(
+    "Operational capability",
+  );
   await expect(page.locator("[data-zone-id]")).toHaveCount(6);
 
   await page.locator("[data-loan-amount='80000']").click();
   await expect(page.locator(".stat-tile").filter({ hasText: "Cash" })).toContainText("¥210,000");
   await expect(page.locator(".finance-panel")).toContainText("¥80,000");
   await expect(
-    page.locator(".event-feed [data-event-category='finance'][data-event-severity='positive']")
+    page.locator(".event-feed [data-event-category='finance'][data-event-severity='positive']"),
   ).toContainText("FINANCE");
   await expect(
-    page.locator(".event-feed [data-event-category='finance'][data-event-severity='positive']")
+    page.locator(".event-feed [data-event-category='finance'][data-event-severity='positive']"),
   ).toContainText("Bank loan approved");
   await expect(page.locator("[data-event-filter='all']")).toContainText("ALL");
   await expect(page.locator("[data-event-filter='finance']")).toContainText("FINANCE");
   await page.locator("[data-event-filter='finance']").click();
   await expect(page.locator("[data-event-filter='finance']")).toHaveAttribute(
     "aria-pressed",
-    "true"
+    "true",
   );
   await expect(page.locator(".event-feed [data-event-category='finance']")).toHaveCount(1);
   await expect(page.locator(".event-feed [data-event-category='founder']")).toHaveCount(0);
@@ -57,10 +60,10 @@ test("plays the startup, recruitment, and time-advance browser flow", async ({ p
   await page.locator("[data-offer-id='next-candidate']").click();
   await expect(page.locator(".event-feed")).toContainText("Candidate skipped");
   await expect(
-    page.locator(".event-feed [data-event-category='people'][data-event-severity='info']")
+    page.locator(".event-feed [data-event-category='people'][data-event-severity='info']"),
   ).toContainText("PEOPLE");
   await expect(page.locator("[data-offer-id='offer-target']")).not.toHaveText(
-    initialTargetOffer ?? ""
+    initialTargetOffer ?? "",
   );
 
   await page.locator("[data-offer-id='offer-target']").click();
@@ -84,4 +87,37 @@ test("plays the startup, recruitment, and time-advance browser flow", async ({ p
   await page.locator("[data-action-id='advance-30-days']").click();
   await expect(page.locator(".stat-tile").filter({ hasText: "Headcount" })).toContainText("1");
   await expect(page.locator(".stat-tile").filter({ hasText: "Valuation" })).toContainText("¥");
+});
+
+test("dispatches secondary browser actions instead of advancing time", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+
+  await page.locator("[data-action-id='purchase-insurance']").click();
+  await expect(page.locator(".event-feed")).toContainText("Insurance purchased");
+
+  await page.locator("[data-action-id='file-insurance-claim']").click();
+  await expect(page.locator(".event-feed")).toContainText("Insurance claim paid");
+
+  await page.locator("[data-action-id='make-investment']").click();
+  await expect(page.locator(".event-feed")).toContainText("Investment made");
+
+  await page.locator("[data-action-id='sell-investment']").click();
+  await expect(page.locator(".event-feed")).toContainText("Investment sold");
+
+  await page.locator("[data-action-id='buy-car']").click();
+  await expect(page.locator(".event-feed")).toContainText("Purchased car");
+
+  await page.locator("[data-action-id='upgrade-car']").click();
+  await expect(page.locator(".event-feed")).toContainText("Upgraded car");
+
+  await page.locator("[data-action-id='get-married']").click();
+  await expect(page.locator(".event-feed")).toContainText("Married");
+
+  await page.locator("[data-action-id='have-child']").click();
+  await expect(page.locator(".event-feed")).toContainText("Child born");
+
+  await page.locator("[data-action-id='toggle-ai-hiring']").click();
+  await expect(page.locator("[data-action-id='run-ai-hiring-cycle']")).toBeEnabled();
 });
