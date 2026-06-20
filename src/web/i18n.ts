@@ -61,6 +61,17 @@ export interface WebScreenCopy {
   perMonthSuffix: string;
   languageToggleAria: string;
   eventFilterAria: string;
+  controlCenter: string;
+  companyConsole: string;
+  cultureConsole: string;
+  recruitmentConsole: string;
+  financeConsole: string;
+  operationsConsole: string;
+  eventLogConsole: string;
+  openPanel: string;
+  closePanel: string;
+  quickActions: string;
+  eventCount: (count: number) => string;
 }
 
 interface LanguageText {
@@ -154,6 +165,17 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       perMonthSuffix: "/月",
       languageToggleAria: "语言",
       eventFilterAria: "事件筛选",
+      controlCenter: "控制中心",
+      companyConsole: "公司总览",
+      cultureConsole: "文化策略",
+      recruitmentConsole: "招聘台",
+      financeConsole: "财务台",
+      operationsConsole: "运营动作",
+      eventLogConsole: "日志",
+      openPanel: "打开",
+      closePanel: "关闭",
+      quickActions: "快捷动作",
+      eventCount: (count) => `${count} 条记录`,
     },
     stageLabels: {
       startup: "创业准备",
@@ -386,6 +408,17 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       perMonthSuffix: "/mo",
       languageToggleAria: "Language",
       eventFilterAria: "Event filters",
+      controlCenter: "Control Center",
+      companyConsole: "Company",
+      cultureConsole: "Culture",
+      recruitmentConsole: "Recruitment",
+      financeConsole: "Finance",
+      operationsConsole: "Operations",
+      eventLogConsole: "Log",
+      openPanel: "Open",
+      closePanel: "Close",
+      quickActions: "Quick Actions",
+      eventCount: (count) => `${count} records`,
     },
     stageLabels: {
       startup: "startup",

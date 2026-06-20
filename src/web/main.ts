@@ -3,6 +3,7 @@ import {
   performSessionAction,
   selectInitialChoice,
   type GameSession,
+  type SessionAction,
   type SessionActionRequest,
 } from "../game/session";
 import { addToLeaderboard } from "../sim/leaderboard";
@@ -17,11 +18,28 @@ const CULTURE_ROTATION: SessionActionRequest[] = [
   { id: "change-culture", culture: "laissez-faire" },
 ];
 
+type WebDialogId = "company" | "culture" | "recruitment" | "finance" | "actions" | "events";
+
+const SECONDARY_ACTION_IDS: Array<SessionAction["id"]> = [
+  "request-policy-support",
+  "toggle-ai-hiring",
+  "run-ai-hiring-cycle",
+  "purchase-insurance",
+  "file-insurance-claim",
+  "make-investment",
+  "sell-investment",
+  "buy-car",
+  "upgrade-car",
+  "get-married",
+  "have-child",
+];
+
 let session: GameSession = createGameSession({ seed: 1 });
 let language: WebLanguage = readInitialLanguage();
 let eventCategoryFilter: WebEventCategoryFilter = "all";
 let showLeaderboard = false;
 let currentLeaderboardId: string | undefined;
+let activeDialog: WebDialogId | undefined;
 const root = getAppRoot();
 
 root.addEventListener("click", handleRootClick);
@@ -101,30 +119,10 @@ function render(): void {
           </div>
 
           <aside class="command-panel">
-            ${screen.founder ? renderFounderPanel(screen.founder) : ""}
-            ${screen.staff ? renderStaffPanel(screen.staff, screen.copy) : ""}
-            ${screen.culture ? renderCulturePanel(screen.culture) : ""}
-            ${screen.recruitment ? renderRecruitmentPanel(screen.recruitment, screen.copy) : ""}
-            ${screen.finance ? renderFinancePanel(screen.finance, screen.copy) : ""}
-            <div class="actions">
-              ${screen.actions
-                .map(
-                  (action) => `
-                    <button
-                      class="action-button"
-                      type="button"
-                      data-action-id="${action.id}"
-                      ${action.enabled ? "" : "disabled"}
-                    >
-                      ${action.label}
-                    </button>
-                  `,
-                )
-                .join("")}
-            </div>
-            ${renderEventFeed(screen)}
+            ${renderControlCenter(screen)}
           </aside>
         </div>
+        ${activeDialog ? renderDialog(screen, activeDialog) : ""}
       </section>
     </main>
   `;
@@ -149,6 +147,26 @@ function handleRootClick(event: MouseEvent): void {
     return;
   }
 
+  if (button.dataset.closeDialog !== undefined) {
+    activeDialog = undefined;
+    render();
+    return;
+  }
+
+  const dialogId = readDialogId(button.dataset.openDialogId);
+  if (dialogId) {
+    activeDialog = dialogId;
+    render();
+    return;
+  }
+
+  const zoneDialogId = readDialogIdForZone(button.dataset.zoneId);
+  if (zoneDialogId) {
+    activeDialog = zoneDialogId;
+    render();
+    return;
+  }
+
   const nextFilter = readEventCategoryFilter(button.dataset.eventFilter);
   if (nextFilter) {
     eventCategoryFilter = nextFilter;
@@ -159,6 +177,7 @@ function handleRootClick(event: MouseEvent): void {
   const choiceId = button.dataset.choiceId;
   if (choiceId) {
     session = selectInitialChoice(session, choiceId);
+    activeDialog = undefined;
     render();
     return;
   }
@@ -172,18 +191,21 @@ function handleRootClick(event: MouseEvent): void {
     session = createGameSession({ seed: Date.now() });
     showLeaderboard = false;
     currentLeaderboardId = undefined;
+    activeDialog = undefined;
     render();
     return;
   }
 
   if (actionId === "view-leaderboard") {
     showLeaderboard = true;
+    activeDialog = undefined;
     render();
     return;
   }
 
   if (actionId === "back-to-game-over") {
     showLeaderboard = false;
+    activeDialog = undefined;
     render();
     return;
   }
@@ -201,7 +223,189 @@ function handleRootClick(event: MouseEvent): void {
       currentLeaderboardId = entry.id;
     }
   }
+  if (session.gameOverReason) {
+    activeDialog = undefined;
+  }
   render();
+}
+
+function renderControlCenter(screen: ReturnType<typeof createWebScreenModel>): string {
+  const advanceAction = findAction(screen, "advance-30-days");
+  const eventCount = screen.eventItems.length || screen.eventFeed.length;
+  const headcount = screen.statTiles.find((tile) => tile.id === "headcount")?.value;
+
+  return `
+    <section class="control-center" aria-label="${screen.copy.controlCenter}">
+      <div class="panel-heading">
+        <span>${screen.copy.controlCenter}</span>
+        <strong>${screen.stageLabel}</strong>
+      </div>
+      <div class="console-grid">
+        <button class="console-card" type="button" data-open-dialog-id="company">
+          <span>${screen.copy.companyConsole}</span>
+          <strong>${headcount ?? "-"}</strong>
+          <em>${screen.founder?.wealth.value ?? screen.copy.openPanel}</em>
+        </button>
+        <button class="console-card" type="button" data-open-dialog-id="culture">
+          <span>${screen.copy.cultureConsole}</span>
+          <strong>${screen.culture?.currentLabel ?? "-"}</strong>
+          <em>${screen.statTiles.find((tile) => tile.id === "morale")?.value ?? "-"}</em>
+        </button>
+        <button class="console-card" type="button" data-open-dialog-id="recruitment">
+          <span>${screen.copy.recruitmentConsole}</span>
+          <strong>${screen.recruitment?.role ?? "-"}</strong>
+          <em>${screen.recruitment?.targetSalary ?? screen.copy.openPanel}</em>
+        </button>
+        <button class="console-card" type="button" data-open-dialog-id="finance">
+          <span>${screen.copy.financeConsole}</span>
+          <strong>${screen.finance?.runway ?? "-"}</strong>
+          <em>${screen.finance?.cash ?? screen.copy.openPanel}</em>
+        </button>
+        <button class="console-card" type="button" data-open-dialog-id="actions">
+          <span>${screen.copy.operationsConsole}</span>
+          <strong>${screen.copy.quickActions}</strong>
+          <em>${SECONDARY_ACTION_IDS.length}</em>
+        </button>
+        <button class="console-card" type="button" data-open-dialog-id="events">
+          <span>${screen.copy.eventLogConsole}</span>
+          <strong>${screen.copy.eventCount(eventCount)}</strong>
+          <em>${screen.copy.openPanel}</em>
+        </button>
+      </div>
+      ${
+        advanceAction
+          ? `
+            <button
+              class="turn-button"
+              type="button"
+              data-action-id="${advanceAction.id}"
+              ${advanceAction.enabled ? "" : "disabled"}
+            >
+              ${advanceAction.label}
+            </button>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderDialog(
+  screen: ReturnType<typeof createWebScreenModel>,
+  dialogId: WebDialogId,
+): string {
+  const title = getDialogTitle(screen, dialogId);
+  const body = renderDialogBody(screen, dialogId);
+
+  return `
+    <div class="dialog-layer">
+      <section
+        class="workspace-dialog"
+        data-dialog-id="${dialogId}"
+        role="dialog"
+        aria-modal="true"
+        aria-label="${title}"
+      >
+        <header class="dialog-header">
+          <h2>${title}</h2>
+          <button class="dialog-close" type="button" data-close-dialog aria-label="${screen.copy.closePanel}">
+            ${screen.copy.closePanel}
+          </button>
+        </header>
+        <div class="dialog-body">
+          ${body}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderDialogBody(
+  screen: ReturnType<typeof createWebScreenModel>,
+  dialogId: WebDialogId,
+): string {
+  if (dialogId === "company") {
+    return `${screen.founder ? renderFounderPanel(screen.founder) : ""}${
+      screen.staff ? renderStaffPanel(screen.staff, screen.copy) : ""
+    }`;
+  }
+
+  if (dialogId === "culture") {
+    return screen.culture ? renderCulturePanel(screen.culture) : "";
+  }
+
+  if (dialogId === "recruitment") {
+    return screen.recruitment ? renderRecruitmentPanel(screen.recruitment, screen.copy) : "";
+  }
+
+  if (dialogId === "finance") {
+    return screen.finance ? renderFinancePanel(screen.finance, screen.copy) : "";
+  }
+
+  if (dialogId === "actions") {
+    return renderSecondaryActions(screen);
+  }
+
+  return renderEventFeed(screen);
+}
+
+function renderSecondaryActions(screen: ReturnType<typeof createWebScreenModel>): string {
+  const actions = screen.actions.filter((action) => SECONDARY_ACTION_IDS.includes(action.id));
+
+  return `
+    <section class="actions-panel" aria-label="${screen.copy.operationsConsole}">
+      <div class="actions">
+        ${actions
+          .map(
+            (action) => `
+              <button
+                class="action-button"
+                type="button"
+                data-action-id="${action.id}"
+                ${action.enabled ? "" : "disabled"}
+              >
+                ${action.label}
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function getDialogTitle(
+  screen: ReturnType<typeof createWebScreenModel>,
+  dialogId: WebDialogId,
+): string {
+  if (dialogId === "company") {
+    return screen.copy.companyConsole;
+  }
+
+  if (dialogId === "culture") {
+    return screen.copy.cultureConsole;
+  }
+
+  if (dialogId === "recruitment") {
+    return screen.copy.recruitmentConsole;
+  }
+
+  if (dialogId === "finance") {
+    return screen.copy.financeConsole;
+  }
+
+  if (dialogId === "actions") {
+    return screen.copy.operationsConsole;
+  }
+
+  return screen.copy.eventLogConsole;
+}
+
+function findAction(
+  screen: ReturnType<typeof createWebScreenModel>,
+  actionId: SessionAction["id"],
+): SessionAction | undefined {
+  return screen.actions.find((action) => action.id === actionId);
 }
 
 function renderFounderPanel(
@@ -832,6 +1036,45 @@ function readEventCategoryFilter(value: string | undefined): WebEventCategoryFil
     value === "operations"
   ) {
     return value;
+  }
+
+  return undefined;
+}
+
+function readDialogId(value: string | undefined): WebDialogId | undefined {
+  if (
+    value === "company" ||
+    value === "culture" ||
+    value === "recruitment" ||
+    value === "finance" ||
+    value === "actions" ||
+    value === "events"
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function readDialogIdForZone(zoneId: string | undefined): WebDialogId | undefined {
+  if (zoneId === "company") {
+    return "company";
+  }
+
+  if (zoneId === "labor-market") {
+    return "recruitment";
+  }
+
+  if (zoneId === "bank" || zoneId === "exchange") {
+    return "finance";
+  }
+
+  if (zoneId === "policy-office") {
+    return "culture";
+  }
+
+  if (zoneId === "court") {
+    return "actions";
   }
 
   return undefined;

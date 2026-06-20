@@ -51,9 +51,9 @@
   --px-road-line:    rgba(255, 255, 255, 0.14);
 
   /* -- Typography -- */
-  font-family: 'Press Start 2P', 'Courier New', monospace;
-  font-size: 10px;
-  line-height: 1.6;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', Inter, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--px-text);
   background: var(--px-black);
   font-synthesis: none;
@@ -71,6 +71,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
   background:
     /* Horizontal scanlines */
     repeating-linear-gradient(
@@ -100,22 +101,31 @@ button {
   image-rendering: pixelated;
 }
 
+#app {
+  height: 100svh;
+  overflow: hidden;
+}
+
 /* ─── Pixel Utility Mixin (via shared properties) ────────────────── */
 /*  All interactive panels share the pixel bevel look  */
 
 .shell {
-  width: min(1180px, calc(100vw - 32px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1360px, calc(100vw - 20px));
+  height: 100svh;
   margin: 0 auto;
-  padding: 24px 0 32px;
+  padding: 10px 0;
+  overflow: hidden;
 }
 
 /* ─── Hero / Title Bar ───────────────────────────────────────────── */
 .hero {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 150px;
+  min-height: 74px;
   border-bottom: 4px solid var(--px-border-light);
   /* Pixel glow on title area */
   text-shadow: 0 0 8px rgba(48, 216, 96, 0.15);
@@ -133,9 +143,9 @@ button {
 }
 
 h1 {
-  margin: 10px 0;
-  font-size: 28px;
-  line-height: 1;
+  margin: 6px 0;
+  font-size: 24px;
+  line-height: 1.12;
   letter-spacing: 0;
   color: var(--px-text);
   text-shadow:
@@ -166,7 +176,7 @@ h1 {
 
 /* ─── Score Chip ─────────────────────────────────────────────────── */
 .score-chip {
-  padding: 10px 12px;
+  padding: 8px 12px;
   color: var(--px-text-dark);
   background: var(--px-gold);
   text-transform: uppercase;
@@ -181,7 +191,7 @@ h1 {
 .hero-tools {
   display: grid;
   justify-items: end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .language-switch {
@@ -191,7 +201,7 @@ h1 {
 
 .language-button {
   min-width: 86px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   color: var(--px-text);
   background: var(--px-tile);
 }
@@ -275,28 +285,32 @@ h1 {
 /* ─── Dashboard ──────────────────────────────────────────────────── */
 .dashboard {
   display: grid;
-  gap: 18px;
-  padding-top: 20px;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  gap: 10px;
+  padding-top: 10px;
 }
 
 /* ─── Stat Grid (9 tiles) ────────────────────────────────────────── */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(9, minmax(94px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .stat-tile {
-  min-height: 76px;
-  padding: 10px;
+  height: 58px;
+  min-height: 0;
+  padding: 7px 8px;
+  overflow: hidden;
   background: var(--px-panel-light);
 }
 
 .stat-tile span {
   display: block;
-  min-height: 30px;
+  min-height: 0;
   color: var(--px-text-dim);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .stat-tile strong {
@@ -307,18 +321,20 @@ h1 {
 /* ─── City Layout ────────────────────────────────────────────────── */
 .city-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  min-height: 0;
+  gap: 12px;
 }
 
 /* ─── City Map (pixel tile grid) ─────────────────────────────────── */
 .city-map {
   display: grid;
   grid-template-columns: repeat(6, minmax(48px, 1fr));
-  grid-template-rows: repeat(5, minmax(64px, 1fr));
+  grid-template-rows: repeat(5, minmax(0, 1fr));
   gap: 4px;
-  min-height: 420px;
-  padding: 14px;
+  min-height: 0;
+  height: 100%;
+  padding: 10px;
   /* Pixel grid lines over grass green */
   background:
     /* Vertical grid lines */
@@ -355,7 +371,7 @@ h1 {
   padding: 6px;
   overflow: hidden;
   text-align: center;
-  font-size: 8px;
+  font-size: 11px;
   image-rendering: pixelated;
 }
 
@@ -476,8 +492,104 @@ h1 {
 /* ─── Command Panel (right sidebar) ──────────────────────────────── */
 .command-panel {
   display: grid;
-  gap: 14px;
-  align-content: start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.control-center {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  background: var(--px-panel);
+  border: 3px solid var(--px-border);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.04),
+    4px 4px 0 var(--px-shadow);
+}
+
+.console-grid {
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 0;
+}
+
+.console-card,
+.turn-button,
+.dialog-close {
+  border: 3px solid var(--px-border);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.08),
+    4px 4px 0 var(--px-shadow),
+    0 0 0 1px var(--px-shadow);
+}
+
+.console-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 4px 8px;
+  min-height: 0;
+  padding: 8px 10px;
+  color: var(--px-text);
+  background: var(--px-panel-light);
+  text-align: left;
+  cursor: pointer;
+}
+
+.console-card span,
+.console-card strong,
+.console-card em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.console-card span {
+  color: var(--px-text-dim);
+  font-size: 10px;
+}
+
+.console-card strong {
+  color: var(--px-green);
+  font-size: 13px;
+}
+
+.console-card em {
+  grid-column: 1 / -1;
+  color: #b8c0d0;
+  font-style: normal;
+  font-size: 11px;
+}
+
+.console-card:hover,
+.turn-button:hover,
+.dialog-close:hover {
+  transform: translate(2px, 2px);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.08),
+    2px 2px 0 var(--px-shadow),
+    0 0 0 1px var(--px-shadow);
+}
+
+.turn-button {
+  min-height: 48px;
+  padding: 10px 12px;
+  color: var(--px-text-dark);
+  background: var(--px-green);
+  cursor: pointer;
+}
+
+.turn-button:disabled {
+  color: #58606a;
+  background: #282a30;
+  cursor: default;
+  transform: none;
+  box-shadow: 2px 2px 0 var(--px-shadow);
 }
 
 /* ─── Panel Cards ────────────────────────────────────────────────── */
@@ -1338,12 +1450,122 @@ h1 {
   box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.05), inset 1px 1px 0 rgba(0, 0, 0, 0.15);
 }
 
+.dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 2px,
+      rgba(0, 0, 0, 0.14) 2px 4px
+    ),
+    rgba(5, 5, 12, 0.72);
+}
+
+.workspace-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(980px, calc(100vw - 48px));
+  max-height: min(86svh, 720px);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--px-dark);
+  border: 4px solid var(--px-border-light);
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 255, 255, 0.06),
+    10px 10px 0 var(--px-shadow);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--px-panel);
+  border-bottom: 3px solid var(--px-border);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  color: var(--px-text);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.dialog-close {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 7px 12px;
+  color: var(--px-text);
+  background: var(--px-tile);
+  cursor: pointer;
+}
+
+.dialog-body {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px;
+  overflow: auto;
+}
+
+.workspace-dialog[data-dialog-id="company"] .dialog-body {
+  grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.2fr);
+  align-items: start;
+}
+
+.workspace-dialog[data-dialog-id="actions"] {
+  width: min(720px, calc(100vw - 48px));
+}
+
+.workspace-dialog[data-dialog-id="events"] {
+  width: min(840px, calc(100vw - 48px));
+}
+
+.actions-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.actions-panel .actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-dialog .event-feed {
+  max-height: 100%;
+}
+
+.console-card:focus-visible,
+.turn-button:focus-visible,
+.dialog-close:focus-visible {
+  outline: 3px solid var(--px-green);
+  outline-offset: 3px;
+}
+
 .is-hidden {
   display: none;
 }
 
 /* ─── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 900px) {
+  body,
+  #app,
+  .shell {
+    height: auto;
+    min-height: 100svh;
+    overflow: auto;
+  }
+
+  .shell {
+    width: min(100vw - 16px, 720px);
+    padding: 8px 0 20px;
+  }
+
   .hero,
   .city-layout {
     grid-template-columns: 1fr;
@@ -1359,7 +1581,30 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .dashboard {
+    grid-template-rows: auto auto;
+  }
+
+  .stat-tile {
+    height: auto;
+    min-height: 54px;
+  }
+
   .city-layout {
     display: grid;
+  }
+
+  .city-map {
+    min-height: 460px;
+  }
+
+  .command-panel,
+  .control-center {
+    min-height: 420px;
+  }
+
+  .workspace-dialog[data-dialog-id="company"] .dialog-body,
+  .actions-panel .actions {
+    grid-template-columns: 1fr;
   }
 }
