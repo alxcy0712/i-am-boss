@@ -45,6 +45,9 @@ export interface WebScreenCopy {
   switchCulture: string;
   recruitmentDesk: string;
   financeDesk: string;
+  offerAmount: string;
+  submitOffer: string;
+  abilityHex: string;
   target: string;
   minimum: string;
   type: string;
@@ -149,6 +152,9 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       switchCulture: "切换",
       recruitmentDesk: "招聘台",
       financeDesk: "财务台",
+      offerAmount: "报价",
+      submitOffer: "提交报价",
+      abilityHex: "能力六边形",
       target: "目标",
       minimum: "底线",
       type: "类型",
@@ -392,6 +398,9 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       switchCulture: "Switch",
       recruitmentDesk: "Recruitment Desk",
       financeDesk: "Finance Desk",
+      offerAmount: "Offer",
+      submitOffer: "Submit Offer",
+      abilityHex: "Ability hex",
       target: "Target",
       minimum: "Minimum",
       type: "Type",
@@ -746,6 +755,14 @@ export function formatOfferLabel(amount: string, language: WebLanguage): string 
 
 export function getNextCandidateLabel(language: WebLanguage): string {
   return TEXT[language].nextCandidate;
+}
+
+export function formatNextCandidateLabel(
+  remaining: number,
+  limit: number,
+  language: WebLanguage,
+): string {
+  return `${TEXT[language].nextCandidate} ${remaining}/${limit}`;
 }
 
 export function formatRunwayMonths(months: number, language: WebLanguage): string {

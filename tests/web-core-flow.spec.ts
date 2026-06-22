@@ -89,13 +89,14 @@ test("plays the startup, recruitment, and time-advance browser flow", async ({ p
   await page.locator("[data-close-dialog]").click();
 
   await page.locator("[data-zone-id='labor-market']").click();
-  const initialTargetOffer = await page.locator("[data-offer-id='offer-target']").textContent();
+  await expect(page.locator("[data-candidate-hex]")).toBeVisible();
+  const offerInput = page.locator("[data-offer-input]");
+  const initialOffer = await offerInput.inputValue();
   await page.locator("[data-offer-id='next-candidate']").click();
-  await expect(page.locator("[data-offer-id='offer-target']")).not.toHaveText(
-    initialTargetOffer ?? "",
-  );
+  await expect(offerInput).not.toHaveValue(initialOffer);
 
-  await page.locator("[data-offer-id='offer-target']").click();
+  await offerInput.fill("50000");
+  await page.locator("[data-offer-form] [data-action-id='recruit-candidate']").click();
   await page.locator("[data-close-dialog]").click();
 
   await page.locator("[data-open-dialog-id='company']").click();
@@ -177,4 +178,73 @@ test("fits the operating screen in a landscape viewport", async ({ page }) => {
   expect(metrics.htmlScrollHeight).toBeLessThanOrEqual(metrics.viewportHeight + 2);
   expect(metrics.bodyScrollHeight).toBeLessThanOrEqual(metrics.viewportHeight + 2);
   expect(metrics.rootFontSize).toBeGreaterThanOrEqual(12);
+});
+
+test("fits the recruitment desk without internal vertical scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  await page.locator("[data-zone-id='labor-market']").click();
+
+  const metrics = await page
+    .locator(".workspace-dialog[data-dialog-id='recruitment']")
+    .evaluate((dialog) => {
+      const body = dialog.querySelector(".dialog-body");
+      if (!(body instanceof HTMLElement)) {
+        throw new Error("Expected recruitment dialog body");
+      }
+
+      const dialogRect = dialog.getBoundingClientRect();
+      const bodyStyle = getComputedStyle(body);
+
+      return {
+        dialogTop: dialogRect.top,
+        dialogBottom: dialogRect.bottom,
+        viewportHeight: window.innerHeight,
+        bodyClientHeight: body.clientHeight,
+        bodyScrollHeight: body.scrollHeight,
+        bodyOverflowY: bodyStyle.overflowY,
+      };
+    });
+
+  expect(metrics.dialogTop).toBeGreaterThanOrEqual(0);
+  expect(metrics.dialogBottom).toBeLessThanOrEqual(metrics.viewportHeight);
+  expect(metrics.bodyScrollHeight).toBeLessThanOrEqual(metrics.bodyClientHeight + 2);
+  expect(metrics.bodyOverflowY).toBe("visible");
+});
+
+test("renders the candidate hex chart at a legible size", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  await page.locator("[data-zone-id='labor-market']").click();
+
+  const metrics = await page.locator("[data-candidate-hex]").evaluate((card) => {
+    const chart = card.querySelector(".candidate-hex-chart");
+    const svgLabel = card.querySelector(".hex-label");
+    const axisList = card.querySelector(".hex-axis-list");
+    if (
+      !(chart instanceof SVGElement) ||
+      !(svgLabel instanceof SVGTextElement) ||
+      !(axisList instanceof HTMLElement)
+    ) {
+      throw new Error("Expected candidate hex chart elements");
+    }
+
+    const chartRect = chart.getBoundingClientRect();
+
+    return {
+      chartWidth: chartRect.width,
+      chartHeight: chartRect.height,
+      svgLabelFontSize: Number.parseFloat(getComputedStyle(svgLabel).fontSize),
+      axisListFontSize: Number.parseFloat(getComputedStyle(axisList).fontSize),
+    };
+  });
+
+  expect(metrics.chartWidth).toBeGreaterThanOrEqual(260);
+  expect(metrics.chartHeight).toBeGreaterThanOrEqual(220);
+  expect(metrics.svgLabelFontSize).toBeGreaterThanOrEqual(5);
+  expect(metrics.axisListFontSize).toBeGreaterThanOrEqual(9);
 });

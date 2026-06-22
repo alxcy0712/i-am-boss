@@ -90,6 +90,50 @@ describe("session actions", () => {
     expect(nextPreview.seed).not.toBe(preview.seed);
   });
 
+  it("limits next-candidate skips to ten and resets the limit after advancing time", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+
+    for (let index = 0; index < 10; index += 1) {
+      session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    }
+
+    expect(session.candidateCursor).toBe(10);
+
+    const blocked = performSessionAction(session, { id: "skip-candidate" } as never);
+    expect(blocked.session.candidateCursor).toBe(10);
+    expect(blocked.message).toContain("No candidate switches remaining");
+
+    const advanced = performSessionAction(blocked.session, { id: "advance-30-days" }).session;
+    const skippedAfterReset = performSessionAction(advanced, { id: "skip-candidate" } as never);
+
+    expect(skippedAfterReset.message).toContain("Skipped candidate");
+    expect(skippedAfterReset.session.candidateCursor).toBe(11);
+  });
+
+  it("hires a skipped-to candidate without spending a next-candidate click", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+    session.state.company.reputation = 10;
+    session.state.company.culture = "adaptive";
+
+    session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+
+    const beforeCursor = session.candidateCursor ?? 0;
+    const beforeSkipCount = session.candidateSkipCount ?? 0;
+    const hired = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    });
+
+    expect(hired.message).toContain("Hired");
+    expect(hired.session.candidateSkipCount).toBe(beforeSkipCount);
+    expect(hired.session.candidateCursor).toBe(beforeCursor + 1);
+  });
+
   it("changes company culture through a city-map action", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const result = performSessionAction(session, {

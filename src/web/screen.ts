@@ -1,8 +1,10 @@
 import {
+  CANDIDATE_SKIP_LIMIT,
   createSessionViewModel,
   getSessionActions,
   previewRecruitmentCandidate,
   type GameSession,
+  type RecruitmentCandidatePreview,
   type SessionAction,
 } from "../game/session";
 import { PROBABILITY_CONFIG } from "../config/probabilities";
@@ -20,10 +22,9 @@ import type {
 import {
   createLanguageOptions,
   formatIndustryExperience,
-  formatOfferLabel,
+  formatNextCandidateLabel,
   formatRunwayMonths,
   getEventAllLabel,
-  getNextCandidateLabel,
   getOperatingSubtitle,
   getStageLabel,
   getStartupEvent,
@@ -149,10 +150,36 @@ export interface WebRecruitmentAbilityRow {
   value: string;
 }
 
+export interface WebRecruitmentAbilityChartAxis {
+  label: string;
+  value: number;
+  valueLabel: string;
+  axisX: string;
+  axisY: string;
+  labelX: string;
+  labelY: string;
+}
+
+export interface WebRecruitmentAbilityChart {
+  label: string;
+  polygonPoints: string;
+  axes: WebRecruitmentAbilityChartAxis[];
+}
+
+export interface WebRecruitmentCustomOffer {
+  inputLabel: string;
+  submitLabel: string;
+  salary: number;
+  equityPercent: number;
+  actionId: "recruit-candidate";
+}
+
 export interface WebRecruitmentOffer {
   id: string;
   label: string;
   actionId: "recruit-candidate" | "skip-candidate";
+  enabled: boolean;
+  remaining?: number;
   salary?: number;
   equityPercent?: number;
 }
@@ -165,6 +192,8 @@ export interface WebRecruitmentPanel {
   targetSalary: string;
   minimumSalary: string;
   abilityRows: WebRecruitmentAbilityRow[];
+  abilityChart: WebRecruitmentAbilityChart;
+  customOffer: WebRecruitmentCustomOffer;
   offerOptions: WebRecruitmentOffer[];
 }
 
@@ -449,7 +478,7 @@ export function createWebScreenModel(
     founder: viewModel ? createFounderPanel(viewModel, language, copy) : undefined,
     staff: viewModel ? createStaffPanel(viewModel, language, copy) : undefined,
     culture: viewModel ? createCulturePanel(viewModel, language, copy) : undefined,
-    recruitment: viewModel ? createRecruitmentPanel(session, language) : undefined,
+    recruitment: viewModel ? createRecruitmentPanel(session, language, copy) : undefined,
     finance: viewModel ? createFinancePanel(session, language) : undefined,
     actions: getSessionActions(session).map((action) => ({
       ...action,
@@ -742,10 +771,14 @@ function createMapTiles(viewModel: GameViewModel, language: WebLanguage): WebMap
   ];
 }
 
-function createRecruitmentPanel(session: GameSession, language: WebLanguage): WebRecruitmentPanel {
+function createRecruitmentPanel(
+  session: GameSession,
+  language: WebLanguage,
+  copy: WebScreenCopy,
+): WebRecruitmentPanel {
   const candidate = previewRecruitmentCandidate(session);
-  const conservativeSalary = Math.round(candidate.targetSalary * 0.9);
   const marketSalary = Math.round(candidate.targetSalary * 0.96);
+  const remainingSkips = Math.max(0, CANDIDATE_SKIP_LIMIT - (session.candidateSkipCount ?? 0));
 
   return {
     role: translateRole(candidate.role, language),
@@ -779,35 +812,103 @@ function createRecruitmentPanel(session: GameSession, language: WebLanguage): We
       { label: translateAbilityLabel("eq", language), value: formatTenPoint(candidate.eq) },
       { label: translateAbilityLabel("iq", language), value: formatTenPoint(candidate.iq) },
     ],
+    abilityChart: createRecruitmentAbilityChart(candidate, language, copy),
+    customOffer: {
+      inputLabel: copy.offerAmount,
+      submitLabel: copy.submitOffer,
+      salary: marketSalary,
+      equityPercent: candidate.equityPercent,
+      actionId: "recruit-candidate",
+    },
     offerOptions: [
       {
-        id: "offer-conservative",
-        label: formatOfferLabel(formatCurrency(conservativeSalary), language),
-        actionId: "recruit-candidate",
-        salary: conservativeSalary,
-        equityPercent: candidate.equityPercent,
-      },
-      {
-        id: "offer-market",
-        label: formatOfferLabel(formatCurrency(marketSalary), language),
-        actionId: "recruit-candidate",
-        salary: marketSalary,
-        equityPercent: candidate.equityPercent,
-      },
-      {
-        id: "offer-target",
-        label: formatOfferLabel(formatCurrency(candidate.targetSalary), language),
-        actionId: "recruit-candidate",
-        salary: candidate.targetSalary,
-        equityPercent: candidate.equityPercent,
-      },
-      {
         id: "next-candidate",
-        label: getNextCandidateLabel(language),
+        label: formatNextCandidateLabel(remainingSkips, CANDIDATE_SKIP_LIMIT, language),
         actionId: "skip-candidate",
+        enabled: remainingSkips > 0,
+        remaining: remainingSkips,
       },
     ],
   };
+}
+
+function createRecruitmentAbilityChart(
+  candidate: RecruitmentCandidatePreview,
+  language: WebLanguage,
+  copy: WebScreenCopy,
+): WebRecruitmentAbilityChart {
+  const axes = [
+    {
+      label: translateAbilityLabel("technical", language),
+      value: candidate.technical,
+      valueLabel: formatTenPoint(candidate.technical),
+    },
+    {
+      label: translateAbilityLabel("experience", language),
+      value: clampTenPoint(candidate.experienceYears),
+      valueLabel:
+        language === "zh-CN" ? `${candidate.experienceYears}年` : `${candidate.experienceYears}y`,
+    },
+    {
+      label: translateAbilityLabel("stressTolerance", language),
+      value: candidate.stressTolerance,
+      valueLabel: formatTenPoint(candidate.stressTolerance),
+    },
+    {
+      label: translateAbilityLabel("communication", language),
+      value: candidate.communication,
+      valueLabel: formatTenPoint(candidate.communication),
+    },
+    {
+      label: translateAbilityLabel("eq", language),
+      value: candidate.eq,
+      valueLabel: formatTenPoint(candidate.eq),
+    },
+    {
+      label: translateAbilityLabel("iq", language),
+      value: candidate.iq,
+      valueLabel: formatTenPoint(candidate.iq),
+    },
+  ];
+
+  const chartAxes = axes.map((axis, index) => {
+    const axisPoint = calculateHexPoint(index, 38);
+    const labelPoint = calculateHexPoint(index, 47);
+
+    return {
+      label: axis.label,
+      value: axis.value,
+      valueLabel: axis.valueLabel,
+      axisX: formatChartNumber(axisPoint.x),
+      axisY: formatChartNumber(axisPoint.y),
+      labelX: formatChartNumber(labelPoint.x),
+      labelY: formatChartNumber(labelPoint.y),
+    };
+  });
+
+  return {
+    label: copy.abilityHex,
+    polygonPoints: axes
+      .map((axis, index) => {
+        const point = calculateHexPoint(index, 38 * (axis.value / 10));
+        return `${formatChartNumber(point.x)},${formatChartNumber(point.y)}`;
+      })
+      .join(" "),
+    axes: chartAxes,
+  };
+}
+
+function calculateHexPoint(index: number, radius: number): { x: number; y: number } {
+  const angle = ((-90 + index * 60) * Math.PI) / 180;
+
+  return {
+    x: 50 + Math.cos(angle) * radius,
+    y: 50 + Math.sin(angle) * radius,
+  };
+}
+
+function formatChartNumber(value: number): string {
+  return value.toFixed(1).replace(/\.0$/, "");
 }
 
 function createFinancePanel(session: GameSession, language: WebLanguage): WebFinancePanel {

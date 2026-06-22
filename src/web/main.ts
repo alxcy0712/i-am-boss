@@ -575,7 +575,7 @@ function createActionRequest(actionId: string, source?: HTMLButtonElement): Sess
   if (actionId === "recruit-candidate") {
     return {
       id: "recruit-candidate",
-      salary: readNumberData(source, "salary"),
+      salary: readRecruitmentOfferSalary(source) ?? readNumberData(source, "salary"),
       equityPercent: readNumberData(source, "equity"),
     };
   }
@@ -686,35 +686,97 @@ function renderRecruitmentPanel(
         <span>${copy.recruitmentDesk}</span>
         <strong>${recruitment.role}</strong>
       </div>
-      <dl class="candidate-meta">
-        <div>
-          <dt>${copy.target}</dt>
-          <dd>${recruitment.targetSalary}</dd>
+      <div class="recruitment-layout">
+        <div class="recruitment-details">
+          <dl class="candidate-meta">
+            <div>
+              <dt>${copy.target}</dt>
+              <dd>${recruitment.targetSalary}</dd>
+            </div>
+            <div>
+              <dt>${copy.minimum}</dt>
+              <dd>${recruitment.minimumSalary}</dd>
+            </div>
+            <div>
+              <dt>${copy.type}</dt>
+              <dd>${recruitment.seniority} / ${recruitment.personality}</dd>
+            </div>
+            <div>
+              <dt>${copy.background}</dt>
+              <dd>${recruitment.background}</dd>
+            </div>
+          </dl>
+          <div class="ability-grid">
+            ${recruitment.abilityRows
+              .map(
+                (row) => `
+                  <div class="ability-row">
+                    <span>${row.label}</span>
+                    <strong>${row.value}</strong>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
         </div>
-        <div>
-          <dt>${copy.minimum}</dt>
-          <dd>${recruitment.minimumSalary}</dd>
+        <div
+          class="candidate-hex-card"
+          aria-label="${recruitment.abilityChart.label}"
+          data-candidate-hex
+        >
+          <span class="hex-title">${recruitment.abilityChart.label}</span>
+          <svg class="candidate-hex-chart" viewBox="0 0 100 100" role="img" aria-label="${recruitment.abilityChart.label}">
+            <polygon class="hex-grid outer" points="50,12 82.9,31 82.9,69 50,88 17.1,69 17.1,31"></polygon>
+            <polygon class="hex-grid inner" points="50,31 66.5,40.5 66.5,59.5 50,69 33.5,59.5 33.5,40.5"></polygon>
+            ${recruitment.abilityChart.axes
+              .map(
+                (axis) => `
+                  <line class="hex-axis" x1="50" y1="50" x2="${axis.axisX}" y2="${axis.axisY}"></line>
+                `,
+              )
+              .join("")}
+            <polygon class="hex-value" points="${recruitment.abilityChart.polygonPoints}"></polygon>
+            ${recruitment.abilityChart.axes
+              .map(
+                (axis) => `
+                  <text class="hex-label" x="${axis.labelX}" y="${axis.labelY}">${axis.label}</text>
+                `,
+              )
+              .join("")}
+          </svg>
+          <div class="hex-axis-list">
+            ${recruitment.abilityChart.axes
+              .map(
+                (axis) => `
+                  <span>${axis.label}</span>
+                  <strong>${axis.valueLabel}</strong>
+                `,
+              )
+              .join("")}
+          </div>
         </div>
-        <div>
-          <dt>${copy.type}</dt>
-          <dd>${recruitment.seniority} / ${recruitment.personality}</dd>
-        </div>
-        <div>
-          <dt>${copy.background}</dt>
-          <dd>${recruitment.background}</dd>
-        </div>
-      </dl>
-      <div class="ability-grid">
-        ${recruitment.abilityRows
-          .map(
-            (row) => `
-              <div class="ability-row">
-                <span>${row.label}</span>
-                <strong>${row.value}</strong>
-              </div>
-            `,
-          )
-          .join("")}
+      </div>
+      <div class="custom-offer" data-offer-form>
+        <label class="offer-input-label">
+          <span>${recruitment.customOffer.inputLabel}</span>
+          <input
+            class="offer-input"
+            type="number"
+            min="0"
+            step="100"
+            inputmode="numeric"
+            value="${recruitment.customOffer.salary}"
+            data-offer-input
+          />
+        </label>
+        <button
+          class="offer-button primary-offer"
+          type="button"
+          data-action-id="${recruitment.customOffer.actionId}"
+          data-equity="${recruitment.customOffer.equityPercent}"
+        >
+          ${recruitment.customOffer.submitLabel}
+        </button>
       </div>
       <div class="offer-grid">
         ${recruitment.offerOptions
@@ -725,8 +787,10 @@ function renderRecruitmentPanel(
                 type="button"
                 data-offer-id="${offer.id}"
                 data-action-id="${offer.actionId}"
+                data-skip-remaining="${offer.remaining ?? ""}"
                 ${offer.salary ? `data-salary="${offer.salary}"` : ""}
                 ${offer.equityPercent ? `data-equity="${offer.equityPercent}"` : ""}
+                ${offer.enabled ? "" : "disabled"}
               >
                 ${offer.label}
               </button>
@@ -1022,6 +1086,15 @@ function renderMapTile(tile: ReturnType<typeof createWebScreenModel>["mapTiles"]
 function readNumberData(source: HTMLButtonElement | undefined, key: string): number | undefined {
   const value = source?.dataset[key];
   return value ? Number(value) : undefined;
+}
+
+function readRecruitmentOfferSalary(source: HTMLButtonElement | undefined): number | undefined {
+  const input = source
+    ?.closest("[data-offer-form]")
+    ?.querySelector<HTMLInputElement>("[data-offer-input]");
+  const value = input?.valueAsNumber;
+
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function readEventCategoryFilter(value: string | undefined): WebEventCategoryFilter | undefined {

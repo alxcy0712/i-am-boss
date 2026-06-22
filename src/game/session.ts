@@ -25,6 +25,8 @@ import type {
 import type { GameViewModel } from "../ui/view-model";
 import { createGameViewModel } from "../ui/view-model";
 
+export const CANDIDATE_SKIP_LIMIT = 10;
+
 export interface GameSession {
   seed: number;
   initialChoices: InitialChoice[];
@@ -33,6 +35,7 @@ export interface GameSession {
   summary?: HarnessSummary;
   gameOverReason?: GameOverReason;
   candidateCursor?: number;
+  candidateSkipCount?: number;
   aiHiringEnabled?: boolean;
 }
 
@@ -95,6 +98,7 @@ export function createGameSession(input: { seed: number }): GameSession {
     seed: input.seed,
     initialChoices: INITIAL_CHOICES,
     candidateCursor: 0,
+    candidateSkipCount: 0,
   };
 }
 
@@ -109,6 +113,8 @@ export function selectInitialChoice(session: GameSession, choiceId: string): Gam
     selectedInitialChoiceId: choiceId,
     state,
     summary: summarizeGameState(state, undefined, session.aiHiringEnabled),
+    candidateCursor: 0,
+    candidateSkipCount: 0,
   };
 }
 
@@ -129,6 +135,7 @@ export function advanceSession(session: GameSession, days: number): GameSession 
     state: result.state,
     summary: summarizeGameState(result.state, result.gameOverReason, session.aiHiringEnabled),
     gameOverReason: result.gameOverReason,
+    candidateSkipCount: 0,
   };
 }
 
@@ -370,6 +377,11 @@ export function performSessionAction(
   }
 
   if (action.id === "skip-candidate") {
+    const candidateSkipCount = session.candidateSkipCount ?? 0;
+    if (candidateSkipCount >= CANDIDATE_SKIP_LIMIT) {
+      return actionResult(session, state, "No candidate switches remaining");
+    }
+
     const preview = previewRecruitmentCandidateForState(session, state);
     recordGameEvent(state, {
       type: "candidate_skipped",
@@ -379,6 +391,7 @@ export function performSessionAction(
       {
         ...session,
         candidateCursor: (session.candidateCursor ?? 0) + 1,
+        candidateSkipCount: candidateSkipCount + 1,
       },
       state,
       `Skipped candidate: ${preview.role}`,
@@ -417,7 +430,7 @@ function recruitCandidate(
       equityPercent: offer.equityPercent,
     });
     return actionResult(
-      { ...session, candidateCursor: 0 },
+      { ...session, candidateCursor: (session.candidateCursor ?? 0) + 1 },
       state,
       `Hired ${preview.role} for ¥${offer.salary.toLocaleString("en-US")}`,
     );

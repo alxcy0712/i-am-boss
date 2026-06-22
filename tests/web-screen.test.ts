@@ -115,7 +115,7 @@ describe("createWebScreenModel", () => {
     expect(new Set(mapTiles.map((tile) => tile.gridArea)).size).toBe(mapTiles.length);
   });
 
-  it("shows a recruitment panel with offer and next-candidate controls", () => {
+  it("shows a recruitment panel with editable offer, next-candidate limit, and ability chart", () => {
     const session = selectInitialChoice(createGameSession({ seed: 9 }), "network-founder");
     const screen = createWebScreenModel(session, { language: "en" });
     const recruitment = (
@@ -125,7 +125,23 @@ describe("createWebScreenModel", () => {
           targetSalary: string;
           minimumSalary: string;
           abilityRows: Array<{ label: string; value: string }>;
-          offerOptions: Array<{ id: string; actionId: string }>;
+          abilityChart: {
+            label: string;
+            polygonPoints: string;
+            axes: Array<{ label: string; value: number; valueLabel: string }>;
+          };
+          customOffer: {
+            inputLabel: string;
+            salary: number;
+            equityPercent: number;
+            actionId: string;
+          };
+          offerOptions: Array<{
+            id: string;
+            actionId: string;
+            enabled: boolean;
+            remaining?: number;
+          }>;
         };
       }
     ).recruitment;
@@ -141,12 +157,55 @@ describe("createWebScreenModel", () => {
       "EQ",
       "IQ",
     ]);
-    expect(recruitment?.offerOptions.map((option) => option.id)).toEqual([
-      "offer-conservative",
-      "offer-market",
-      "offer-target",
-      "next-candidate",
+    expect(recruitment?.abilityChart.label).toBe("Ability hex");
+    expect(recruitment?.abilityChart.axes.map((axis) => axis.label)).toEqual([
+      "Technical",
+      "Experience",
+      "Stress",
+      "Communication",
+      "EQ",
+      "IQ",
     ]);
+    expect(
+      recruitment?.abilityChart.axes.every((axis) => axis.value >= 0 && axis.value <= 10),
+    ).toBe(true);
+    expect(recruitment?.abilityChart.polygonPoints.split(" ")).toHaveLength(6);
+    expect(recruitment?.customOffer.inputLabel).toBe("Offer");
+    expect(recruitment?.customOffer.salary).toBeGreaterThan(0);
+    expect(recruitment?.customOffer.actionId).toBe("recruit-candidate");
+    expect(recruitment?.offerOptions).toHaveLength(1);
+    expect(recruitment?.offerOptions[0]).toMatchObject({
+      id: "next-candidate",
+      actionId: "skip-candidate",
+      enabled: true,
+      remaining: 10,
+    });
+  });
+
+  it("disables next-candidate after ten skips and re-enables it after advancing time", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 9 }), "network-founder");
+
+    for (let index = 0; index < 10; index += 1) {
+      session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    }
+
+    const blockedScreen = createWebScreenModel(session, { language: "en" });
+    expect(blockedScreen.recruitment?.offerOptions).toHaveLength(1);
+    expect(blockedScreen.recruitment?.offerOptions[0]).toMatchObject({
+      id: "next-candidate",
+      actionId: "skip-candidate",
+      enabled: false,
+      remaining: 0,
+    });
+
+    const advanced = performSessionAction(session, { id: "advance-30-days" }).session;
+    const resetScreen = createWebScreenModel(advanced, { language: "en" });
+
+    expect(resetScreen.recruitment?.offerOptions[0]).toMatchObject({
+      id: "next-candidate",
+      enabled: true,
+      remaining: 10,
+    });
   });
 
   it("shows localized staff mix and payroll metrics after hiring", () => {
