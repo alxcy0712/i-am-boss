@@ -248,3 +248,25 @@ test("renders the candidate hex chart at a legible size", async ({ page }) => {
   expect(metrics.svgLabelFontSize).toBeGreaterThanOrEqual(5);
   expect(metrics.axisListFontSize).toBeGreaterThanOrEqual(9);
 });
+
+test("disables custom recruitment offers until the salary is valid", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  await page.locator("[data-open-dialog-id='recruitment']").click();
+
+  const offerInput = page.locator("[data-offer-input]");
+  const submitOffer = page.locator("[data-offer-form] [data-action-id='recruit-candidate']");
+
+  await offerInput.fill("");
+  await expect(submitOffer).toBeDisabled();
+
+  await offerInput.fill("-1");
+  await expect(submitOffer).toBeDisabled();
+
+  await offerInput.fill("0");
+  await expect(submitOffer).toBeDisabled();
+
+  await offerInput.fill("100");
+  await expect(submitOffer).toBeEnabled();
+});

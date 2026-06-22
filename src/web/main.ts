@@ -43,6 +43,7 @@ let activeDialog: WebDialogId | undefined;
 const root = getAppRoot();
 
 root.addEventListener("click", handleRootClick);
+root.addEventListener("input", handleRootInput);
 render();
 
 function render(): void {
@@ -187,6 +188,15 @@ function handleRootClick(event: MouseEvent): void {
     return;
   }
 
+  if (actionId === "recruit-candidate" && !isCustomRecruitmentOfferValid(button)) {
+    updateCustomRecruitmentOfferState(button);
+    button
+      .closest("[data-offer-form]")
+      ?.querySelector<HTMLInputElement>("[data-offer-input]")
+      ?.reportValidity();
+    return;
+  }
+
   if (actionId === "play-again") {
     session = createGameSession({ seed: Date.now() });
     showLeaderboard = false;
@@ -227,6 +237,17 @@ function handleRootClick(event: MouseEvent): void {
     activeDialog = undefined;
   }
   render();
+}
+
+function handleRootInput(event: Event): void {
+  const target = event.target;
+  if (!(target instanceof Element) || !root.contains(target)) {
+    return;
+  }
+
+  if (target.matches("[data-offer-input]")) {
+    updateCustomRecruitmentOfferState(target);
+  }
 }
 
 function renderControlCenter(screen: ReturnType<typeof createWebScreenModel>): string {
@@ -762,9 +783,10 @@ function renderRecruitmentPanel(
           <input
             class="offer-input"
             type="number"
-            min="0"
+            min="100"
             step="100"
             inputmode="numeric"
+            required
             value="${recruitment.customOffer.salary}"
             data-offer-input
           />
@@ -1095,6 +1117,26 @@ function readRecruitmentOfferSalary(source: HTMLButtonElement | undefined): numb
   const value = input?.valueAsNumber;
 
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function isCustomRecruitmentOfferValid(source: Element): boolean {
+  const input = source
+    .closest("[data-offer-form]")
+    ?.querySelector<HTMLInputElement>("[data-offer-input]");
+
+  return !input || (input.validity.valid && input.valueAsNumber > 0);
+}
+
+function updateCustomRecruitmentOfferState(source: Element): void {
+  const form = source.closest("[data-offer-form]");
+  const input = form?.querySelector<HTMLInputElement>("[data-offer-input]");
+  const button = form?.querySelector<HTMLButtonElement>("[data-action-id='recruit-candidate']");
+
+  if (!input || !button) {
+    return;
+  }
+
+  button.disabled = !isCustomRecruitmentOfferValid(input);
 }
 
 function readEventCategoryFilter(value: string | undefined): WebEventCategoryFilter | undefined {
