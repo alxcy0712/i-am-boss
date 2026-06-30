@@ -47,6 +47,8 @@ npm run balance -- --seedStart 1 --runs 10 --days 365 --checkpointIntervalDays 9
 npm run probability:audit
 ```
 
+`npm run test:e2e` uses in-memory browser screenshots for desktop and mobile layout checks without keeping local screenshot artifacts.
+
 ## Project Layout
 
 ```text
