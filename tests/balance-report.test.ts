@@ -5,6 +5,17 @@ import type { HarnessCheckpoint, HarnessSummary } from "../src/harness/sim-harne
 import type { GameOverReason } from "../src/sim/types";
 
 describe("runBalanceReport", () => {
+  it("rejects fractional run counts", () => {
+    expect(() =>
+      runBalanceReport({
+        seedStart: 1,
+        runs: 1.5,
+        days: 30,
+        initialChoiceId: "network-founder",
+      }),
+    ).toThrow("Invalid balance runs: expected a positive integer");
+  });
+
   it("runs deterministic multi-seed simulations with capped event logs", () => {
     const report = runBalanceReport({
       seedStart: 1,
@@ -63,6 +74,21 @@ describe("runBalanceReport", () => {
     ).toBeCloseTo(1);
     expect(results.every((result) => result.summary.eventLog.length <= 6)).toBe(true);
     expect(results.every((result) => result.summary.events.length <= 6)).toBe(true);
+  });
+
+  it("treats invalid timeline event log caps as zero entries", () => {
+    const report = runBalanceReport({
+      seedStart: 1,
+      runs: 2,
+      days: 200,
+      initialChoiceId: "network-founder",
+      maxEventLogEntries: -1,
+      checkpointIntervalDays: 90,
+    });
+
+    expect(report.results?.every((result) => result.summary.eventLog.length === 0)).toBe(true);
+    expect(report.results?.every((result) => result.summary.events.length === 0)).toBe(true);
+    expect(report.eventLogTruncatedCount).toBe(2);
   });
 });
 

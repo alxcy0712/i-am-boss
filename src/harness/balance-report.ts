@@ -75,6 +75,10 @@ export interface EndingDistributionEntry {
 export type EndingDistribution = Record<GameOverReason | "operating", EndingDistributionEntry>;
 
 export function runBalanceReport(input: BalanceReportInput): BalanceReport {
+  if (!Number.isInteger(input.runs) || input.runs <= 0) {
+    throw new Error("Invalid balance runs: expected a positive integer");
+  }
+
   if (input.checkpointIntervalDays && input.checkpointIntervalDays > 0) {
     const timelineRuns = Array.from({ length: input.runs }, (_, index) =>
       runBalanceTimeline({
@@ -173,7 +177,10 @@ function runBalanceTimeline(input: {
 }): { result: FastForwardResult; checkpoints: HarnessCheckpoint[] } {
   const startedAt = performance.now();
   const timeline = runHarnessTimeline(input);
-  const maxEventLogEntries = input.maxEventLogEntries ?? timeline.summary.eventLog.length;
+  const maxEventLogEntries = normalizeEventLogCap(
+    input.maxEventLogEntries,
+    timeline.summary.eventLog.length,
+  );
   const eventLogTruncated = timeline.summary.eventLog.length > maxEventLogEntries;
   const cappedSummary = capSummaryEventLog({
     summary: timeline.summary,
@@ -191,6 +198,16 @@ function runBalanceTimeline(input: {
   };
 }
 
+function normalizeEventLogCap(value: number | undefined, fallback: number): number {
+  if (value === undefined) {
+    return fallback;
+  }
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return Math.floor(value);
+}
+
 function capSummaryEventLog(input: {
   summary: HarnessSummary;
   maxEventLogEntries: number;
@@ -199,12 +216,16 @@ function capSummaryEventLog(input: {
   return {
     ...input.summary,
     events: input.eventLogTruncated
-      ? input.summary.events.slice(-input.maxEventLogEntries)
+      ? sliceLast(input.summary.events, input.maxEventLogEntries)
       : input.summary.events,
     eventLog: input.eventLogTruncated
-      ? input.summary.eventLog.slice(-input.maxEventLogEntries)
+      ? sliceLast(input.summary.eventLog, input.maxEventLogEntries)
       : input.summary.eventLog,
   };
+}
+
+function sliceLast<T>(items: T[], count: number): T[] {
+  return count === 0 ? [] : items.slice(-count);
 }
 
 function createBalanceEventSummary(results: FastForwardResult[]): GameEventSummary {
