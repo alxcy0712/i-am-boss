@@ -27,4 +27,20 @@ describe("changeCompanyCulture", () => {
     expect(state.company.culturePressure).toBe(3);
     expect(state.company.morale).toBeGreaterThan(7);
   });
+
+  it("ignores invalid culture values", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const previous = {
+      culture: state.company.culture,
+      culturePressure: state.company.culturePressure,
+      cash: state.company.cash,
+      morale: state.company.morale,
+      reputation: state.company.reputation,
+    };
+
+    changeCompanyCulture(state, { culture: undefined as never });
+
+    expect(state.company).toMatchObject(previous);
+    expect(state.eventLog).not.toContain("Culture changed: undefined");
+  });
 });

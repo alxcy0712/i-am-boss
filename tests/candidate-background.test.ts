@@ -3,6 +3,7 @@ import {
   calculateBackgroundTechnicalBonus,
   calculateCandidateTargetSalary,
   generateCandidate,
+  generateCandidateBackground,
 } from "../src/sim/staffing";
 import type { CandidateBackground } from "../src/sim/types";
 import { createInitialGameState } from "../src/sim/state";
@@ -92,6 +93,59 @@ describe("candidate background", () => {
     );
     expect(highReputation.technical).toBeGreaterThanOrEqual(lowReputation.technical);
     expect(highReputation.targetSalary).toBeGreaterThan(lowReputation.targetSalary);
+  });
+
+  it("keeps generated backgrounds finite for invalid role and experience inputs", () => {
+    const background = generateCandidateBackground({
+      role: "invalid" as never,
+      experienceYears: Number.NaN,
+      educationRoll: Number.NaN,
+      majorRoll: Infinity,
+      industryRoll: Number.NaN,
+    });
+
+    expect(["elite", "strong", "standard", "vocational"]).toContain(background.educationTier);
+    expect([
+      "computer-science",
+      "engineering",
+      "business",
+      "finance",
+      "design",
+      "operations",
+    ]).toContain(background.major);
+    expect(background.industryExperienceYears).toBe(0);
+  });
+
+  it("keeps technical bonuses finite for invalid background values", () => {
+    const bonus = calculateBackgroundTechnicalBonus({
+      role: "invalid" as never,
+      background: {
+        educationTier: "invalid" as never,
+        major: "invalid" as never,
+        industryExperienceYears: Number.NaN,
+      },
+    });
+
+    expect(Number.isFinite(bonus)).toBe(true);
+    expect(bonus).toBeGreaterThanOrEqual(0);
+  });
+
+  it("keeps salary expectations finite for invalid background and ability values", () => {
+    const salary = calculateCandidateTargetSalary({
+      role: "engineer",
+      seniority: "mid",
+      technical: Number.NaN,
+      communication: Infinity,
+      iq: Number.NaN,
+      background: {
+        educationTier: "invalid" as never,
+        major: "invalid" as never,
+        industryExperienceYears: Infinity,
+      },
+    });
+
+    expect(Number.isFinite(salary)).toBe(true);
+    expect(salary).toBeGreaterThan(0);
   });
 });
 

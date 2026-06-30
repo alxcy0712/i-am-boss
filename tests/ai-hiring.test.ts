@@ -49,6 +49,20 @@ describe("getAIHiringDecision", () => {
 
     expect(decision.targetSalaryMin).toBe(8_500);
   });
+
+  it("returns finite salary targets for invalid cash and market rates", () => {
+    const decision = getAIHiringDecision({
+      role: "engineer",
+      companyCash: Number.NaN,
+      marketRate: Number.NaN,
+    });
+
+    expect(decision.strategy).toBe("conservative");
+    expect(Number.isFinite(decision.targetSalaryMin)).toBe(true);
+    expect(Number.isFinite(decision.targetSalaryMax)).toBe(true);
+    expect(decision.targetSalaryMin).toBeGreaterThan(0);
+    expect(decision.targetSalaryMax).toBeGreaterThan(0);
+  });
 });
 
 describe("evaluateHiringNeeds", () => {
@@ -112,6 +126,20 @@ describe("evaluateHiringNeeds", () => {
 
     const needs = evaluateHiringNeeds(state);
     expect(needs).toEqual([]);
+  });
+
+  it("detects hiring needs when current burn is invalid but cash is available", () => {
+    const state = createInitialGameState({ seed: 42 });
+    state.company.headcount = 2;
+    state.company.annualRevenue = 50_000;
+    state.company.cash = 200_000;
+    state.company.monthlyBurn = Number.NaN;
+    state.company.employees = [];
+
+    const needs = evaluateHiringNeeds(state);
+
+    expect(needs.length).toBeGreaterThan(0);
+    expect(needs[0].role).toBe("engineer");
   });
 
   it("prioritizes engineer role", () => {

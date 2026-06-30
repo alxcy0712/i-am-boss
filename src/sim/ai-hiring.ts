@@ -33,6 +33,8 @@ export interface HiringCycleResult {
 export function evaluateHiringNeeds(state: GameState): HiringNeed[] {
   const config = PROBABILITY_CONFIG.aiHiring;
   const { headcount, annualRevenue, resources, cash, monthlyBurn } = state.company;
+  const availableCash = readNonNegativeFinite(cash, 0);
+  const currentMonthlyBurn = readNonNegativeFinite(monthlyBurn, 0);
   const plannedRoles = getHiringPlan({
     headcount,
     annualRevenue,
@@ -47,7 +49,7 @@ export function evaluateHiringNeeds(state: GameState): HiringNeed[] {
     const expectedCount = Math.ceil(headcount / plannedRoles.length);
     const deficit = expectedCount - currentCount;
 
-    if (deficit > 0 && cash > monthlyBurn * 3) {
+    if (deficit > 0 && availableCash > currentMonthlyBurn * 3) {
       const seniority: Seniority = headcount > 15 ? "mid" : "junior";
       needs.push({
         role,
@@ -172,4 +174,8 @@ function countRoles(state: GameState): Record<CompanyRole, number> {
   }
 
   return counts;
+}
+
+function readNonNegativeFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
