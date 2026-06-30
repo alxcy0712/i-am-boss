@@ -37,6 +37,14 @@ function generateId(prefix: string): string {
 }
 
 export function purchaseCar(state: GameState, input: { brand: string; value: number }): CarResult {
+  if (typeof input.brand !== "string" || !input.brand.trim()) {
+    return { success: false, reason: "invalid_brand" };
+  }
+
+  if (!Number.isFinite(input.value)) {
+    return { success: false, reason: "invalid_value" };
+  }
+
   if (input.value <= 0) {
     return { success: false, reason: "invalid_value" };
   }
@@ -70,6 +78,10 @@ export function upgradeCar(
   state: GameState,
   input: { carId: string; newValue: number },
 ): CarResult {
+  if (!Number.isFinite(input.newValue)) {
+    return { success: false, reason: "invalid_value" };
+  }
+
   if (input.newValue <= 0) {
     return { success: false, reason: "invalid_value" };
   }
@@ -92,18 +104,20 @@ export function upgradeCar(
   car.value = input.newValue;
   car.maintenanceCost = input.newValue * CONFIG.carMaintenanceRate;
 
-  recordGameEvent(state, {
-    type: "car_upgraded",
-    carId: car.id,
-    brand: car.brand,
-    newValue: car.value,
-  });
+  if (typeof car.brand === "string" && car.brand.trim()) {
+    recordGameEvent(state, {
+      type: "car_upgraded",
+      carId: car.id,
+      brand: car.brand,
+      newValue: car.value,
+    });
+  }
 
   return { success: true, car };
 }
 
 export function getMarried(state: GameState, input: { spouseName: string }): MarriageResult {
-  if (!input.spouseName.trim()) {
+  if (typeof input.spouseName !== "string" || !input.spouseName.trim()) {
     return { success: false, reason: "invalid_name" };
   }
 
@@ -134,7 +148,7 @@ export function getMarried(state: GameState, input: { spouseName: string }): Mar
 }
 
 export function haveChild(state: GameState, input: { childName: string }): ChildResult {
-  if (!input.childName.trim()) {
+  if (typeof input.childName !== "string" || !input.childName.trim()) {
     return { success: false, reason: "invalid_name" };
   }
 
@@ -169,13 +183,19 @@ export function haveChild(state: GameState, input: { childName: string }): Child
 export function processPersonalExpenses(state: GameState): ExpenseResult {
   const personalLife = state.founder.personalLife;
 
-  const carMaintenance = personalLife.cars.reduce((sum, car) => sum + car.maintenanceCost, 0);
+  const carMaintenance = personalLife.cars.reduce(
+    (sum, car) => sum + readNonNegativeFinite(car.maintenanceCost, 0),
+    0,
+  );
 
   const marriageExpense = personalLife.marriage
-    ? state.founder.wealth * CONFIG.marriageExpenseRate
+    ? readNonNegativeFinite(state.founder.wealth, 0) * CONFIG.marriageExpenseRate
     : 0;
 
-  const childEducation = personalLife.children.reduce((sum, child) => sum + child.educationCost, 0);
+  const childEducation = personalLife.children.reduce(
+    (sum, child) => sum + readNonNegativeFinite(child.educationCost, 0),
+    0,
+  );
 
   const totalExpenses = carMaintenance + marriageExpense + childEducation;
 
@@ -226,11 +246,13 @@ export function maybeProcessDivorce(state: GameState): boolean {
   state.founder.personalLife.marriage = undefined;
   state.founder.personalLife.happiness = clamp(state.founder.personalLife.happiness - 3, 0, 10);
 
-  recordGameEvent(state, {
-    type: "divorce",
-    spouseName: marriage.spouseName,
-    wealthLoss,
-  });
+  if (typeof marriage.spouseName === "string" && marriage.spouseName.trim()) {
+    recordGameEvent(state, {
+      type: "divorce",
+      spouseName: marriage.spouseName,
+      wealthLoss,
+    });
+  }
 
   return true;
 }
@@ -245,13 +267,24 @@ export function getPersonalLifeSummary(state: GameState): {
 } {
   const personalLife = state.founder.personalLife;
   const carCount = personalLife.cars.length;
-  const totalCarValue = personalLife.cars.reduce((sum, car) => sum + car.value, 0);
+  const totalCarValue = personalLife.cars.reduce(
+    (sum, car) => sum + readNonNegativeFinite(car.value, 0),
+    0,
+  );
   const isMarried = Boolean(personalLife.marriage);
   const childCount = personalLife.children.length;
 
-  const carMaintenance = personalLife.cars.reduce((sum, car) => sum + car.maintenanceCost, 0);
-  const marriageExpense = isMarried ? state.founder.wealth * CONFIG.marriageExpenseRate : 0;
-  const childEducation = personalLife.children.reduce((sum, child) => sum + child.educationCost, 0);
+  const carMaintenance = personalLife.cars.reduce(
+    (sum, car) => sum + readNonNegativeFinite(car.maintenanceCost, 0),
+    0,
+  );
+  const marriageExpense = isMarried
+    ? readNonNegativeFinite(state.founder.wealth, 0) * CONFIG.marriageExpenseRate
+    : 0;
+  const childEducation = personalLife.children.reduce(
+    (sum, child) => sum + readNonNegativeFinite(child.educationCost, 0),
+    0,
+  );
   const monthlyExpenses = carMaintenance + marriageExpense + childEducation;
 
   return {
@@ -262,4 +295,8 @@ export function getPersonalLifeSummary(state: GameState): {
     monthlyExpenses,
     happiness: calculatePersonalHappiness(state),
   };
+}
+
+function readNonNegativeFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
 }

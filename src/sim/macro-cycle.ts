@@ -10,7 +10,7 @@ export interface MacroCycleInfo {
 const PHASES: MacroCyclePhase[] = ["recovery", "prosperity", "recession", "depression"];
 
 export function getKondratievPhase(day: number): MacroCycleInfo {
-  const cycleDay = day % PROBABILITY_CONFIG.macroCycle.cycleLengthDays;
+  const cycleDay = normalizeCycleDay(day, PROBABILITY_CONFIG.macroCycle.cycleLengthDays);
   const phaseLength = PROBABILITY_CONFIG.macroCycle.cycleLengthDays / PHASES.length;
   const phase = PHASES[Math.floor(cycleDay / phaseLength)] ?? "recovery";
   const config = PROBABILITY_CONFIG.macroCycle.phases[phase];
@@ -29,4 +29,12 @@ export function applyMacroCycle(state: GameState, day: number): MacroCycleInfo {
   state.marketSentiment = cycle.marketSentiment;
 
   return cycle;
+}
+
+function normalizeCycleDay(day: number, cycleLengthDays: number): number {
+  if (!Number.isFinite(day)) {
+    return 0;
+  }
+
+  return ((day % cycleLengthDays) + cycleLengthDays) % cycleLengthDays;
 }

@@ -9,6 +9,7 @@ import {
   getPersonalLifeSummary,
 } from "../src/sim/founder-life";
 import { advanceFounderLifecycle } from "../src/sim/founder-lifecycle";
+import { deserializeGameState, serializeGameState } from "../src/harness/snapshot";
 import { createInitialGameState } from "../src/sim/state";
 
 describe("purchaseCar", () => {
@@ -44,6 +45,42 @@ describe("purchaseCar", () => {
 
     expect(result.success).toBe(false);
     expect(result.reason).toBe("invalid_value");
+  });
+
+  it("rejects purchase with non-finite value", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const wealthBefore = state.founder.wealth;
+
+    const result = purchaseCar(state, { brand: "BMW", value: Number.NaN });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("invalid_value");
+    expect(state.founder.wealth).toBe(wealthBefore);
+    expect(state.founder.personalLife.cars).toHaveLength(0);
+  });
+
+  it("rejects purchase with empty brand", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const wealthBefore = state.founder.wealth;
+
+    const result = purchaseCar(state, { brand: "   ", value: 5000 });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("invalid_brand");
+    expect(state.founder.wealth).toBe(wealthBefore);
+    expect(state.founder.personalLife.cars).toHaveLength(0);
+  });
+
+  it("rejects purchase with missing brand without throwing", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const wealthBefore = state.founder.wealth;
+
+    const result = purchaseCar(state, { brand: undefined as never, value: 5000 });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("invalid_brand");
+    expect(state.founder.wealth).toBe(wealthBefore);
+    expect(state.founder.personalLife.cars).toHaveLength(0);
   });
 
   it("records car_purchased event", () => {
@@ -119,6 +156,21 @@ describe("upgradeCar", () => {
     expect(result.reason).toBe("insufficient_wealth");
   });
 
+  it("rejects upgrade with non-finite value", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const purchaseResult = purchaseCar(state, { brand: "Toyota", value: 5000 });
+    const car = purchaseResult.car!;
+    const wealthBefore = state.founder.wealth;
+
+    const result = upgradeCar(state, { carId: car.id, newValue: Number.NaN });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("invalid_value");
+    expect(state.founder.wealth).toBe(wealthBefore);
+    expect(car.value).toBe(5000);
+    expect(car.maintenanceCost).toBe(100);
+  });
+
   it("updates maintenance cost after upgrade", () => {
     const state = createInitialGameState({ seed: 1 });
     const purchaseResult = purchaseCar(state, { brand: "Toyota", value: 5000 });
@@ -126,6 +178,25 @@ describe("upgradeCar", () => {
     upgradeCar(state, { carId: purchaseResult.car!.id, newValue: 10000 });
 
     expect(state.founder.personalLife.cars[0].maintenanceCost).toBe(200);
+  });
+
+  it("upgrades cars with corrupted brands without recording invalid events", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const purchaseResult = purchaseCar(state, { brand: "Toyota", value: 5000 });
+    const car = purchaseResult.car!;
+    const wealthBefore = state.founder.wealth;
+    const eventCount = state.events.length;
+    const eventLog = [...state.eventLog];
+    car.brand = " ";
+
+    const result = upgradeCar(state, { carId: car.id, newValue: 10000 });
+
+    expect(result.success).toBe(true);
+    expect(car.value).toBe(10000);
+    expect(car.maintenanceCost).toBe(200);
+    expect(state.founder.wealth).toBe(wealthBefore - 5000);
+    expect(state.events).toHaveLength(eventCount);
+    expect(state.eventLog).toEqual(eventLog);
   });
 
   it("records car_upgraded event", () => {
@@ -160,6 +231,16 @@ describe("getMarried", () => {
 
     expect(result.success).toBe(false);
     expect(result.reason).toBe("invalid_name");
+  });
+
+  it("rejects marriage with missing name without throwing", () => {
+    const state = createInitialGameState({ seed: 1 });
+
+    const result = getMarried(state, { spouseName: undefined as never });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("invalid_name");
+    expect(state.founder.personalLife.marriage).toBeUndefined();
   });
 
   it("rejects marriage when already married", () => {
@@ -216,6 +297,17 @@ describe("haveChild", () => {
 
     expect(result.success).toBe(false);
     expect(result.reason).toBe("invalid_name");
+  });
+
+  it("rejects child with missing name without throwing", () => {
+    const state = createInitialGameState({ seed: 1 });
+    getMarried(state, { spouseName: "Alice" });
+
+    const result = haveChild(state, { childName: undefined as never });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("invalid_name");
+    expect(state.founder.personalLife.children).toHaveLength(0);
   });
 
   it("records child_born event", () => {
@@ -294,6 +386,24 @@ describe("processPersonalExpenses", () => {
     processPersonalExpenses(state);
 
     expect(state.founder.wealth).toBe(0);
+  });
+
+  it("keeps expenses finite when car fields are corrupted", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const car = purchaseCar(state, { brand: "Toyota", value: 1000 }).car!;
+    car.value = Number.NaN;
+    car.maintenanceCost = Number.NaN;
+    const wealthBefore = state.founder.wealth;
+
+    const result = processPersonalExpenses(state);
+
+    expect(result).toMatchObject({
+      totalExpenses: 0,
+      carMaintenance: 0,
+      marriageExpense: 0,
+      childEducation: 0,
+    });
+    expect(state.founder.wealth).toBe(wealthBefore);
   });
 });
 
@@ -394,6 +504,26 @@ describe("maybeProcessDivorce", () => {
     expect(state.founder.wealth).toBeLessThan(wealthBefore);
   });
 
+  it("processes divorce with corrupted spouse names without recording invalid events", () => {
+    const state = createInitialGameState({ seed: 1 });
+    getMarried(state, { spouseName: "Alice" });
+    state.founder.personalLife.happiness = 0;
+    state.founder.personalLife.marriage!.divorceRisk = 0.9;
+    state.founder.personalLife.marriage!.spouseName = " ";
+    const wealthBefore = state.founder.wealth;
+    const eventCount = state.events.length;
+    const eventLog = [...state.eventLog];
+
+    const divorced = maybeProcessDivorce(state);
+
+    expect(divorced).toBe(true);
+    expect(state.founder.wealth).toBeLessThan(wealthBefore);
+    expect(state.founder.personalLife.marriage).toBeUndefined();
+    expect(state.events).toHaveLength(eventCount);
+    expect(state.eventLog).toEqual(eventLog);
+    expect(() => deserializeGameState(serializeGameState(state))).not.toThrow();
+  });
+
   it("records divorce event", () => {
     const state = createInitialGameState({ seed: 1 });
     getMarried(state, { spouseName: "Alice" });
@@ -418,6 +548,20 @@ describe("maybeProcessDivorce", () => {
 });
 
 describe("getPersonalLifeSummary", () => {
+  it("returns finite values when car fields are corrupted", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const car = purchaseCar(state, { brand: "Toyota", value: 1000 }).car!;
+    car.value = Number.NaN;
+    car.maintenanceCost = Number.NaN;
+
+    const summary = getPersonalLifeSummary(state);
+
+    expect(summary.carCount).toBe(1);
+    expect(summary.totalCarValue).toBe(0);
+    expect(summary.monthlyExpenses).toBe(0);
+    expect(Number.isFinite(summary.happiness)).toBe(true);
+  });
+
   it("returns summary with no personal life", () => {
     const state = createInitialGameState({ seed: 1 });
 
