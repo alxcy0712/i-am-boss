@@ -162,6 +162,82 @@ test("dispatches secondary browser actions instead of advancing time", async ({ 
   await expect(page.locator(".event-feed")).toContainText("Child born");
 });
 
+test("dispatches the finance button loan amount from DOM data", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  await page.locator("[data-open-dialog-id='finance']").click();
+
+  await page.locator("[data-action-id='request-bank-loan']").evaluate((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error("Expected bank loan button");
+    }
+    button.dataset.loanAmount = "1";
+  });
+  await page.locator("[data-action-id='request-bank-loan']").click();
+  await page.locator("[data-close-dialog]").click();
+  await page.locator("[data-open-dialog-id='events']").click();
+
+  await expect(page.locator(".event-feed")).toContainText("Bank loan approved: 1");
+});
+
+test("ignores unknown browser action ids without advancing time", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  const statValuesBefore = await page.locator(".stat-tile strong").allTextContents();
+
+  await page.evaluate(() => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.actionId = "unknown-action";
+    button.textContent = "Unknown action";
+    document.querySelector("#app")?.append(button);
+  });
+  await page.locator("[data-action-id='unknown-action']").click();
+
+  await expect(page.locator("[data-stage]")).toHaveAttribute("data-stage", "operating");
+  await expect(page.locator(".stat-tile strong")).toHaveText(statValuesBefore);
+});
+
+test("ignores unknown startup choice ids without throwing", async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.choiceId = "unknown-founder";
+    button.textContent = "Unknown founder";
+    document.querySelector(".startup")?.append(button);
+  });
+  await page.locator("[data-choice-id='unknown-founder']").click();
+
+  await expect(page.locator("[data-stage]")).toHaveAttribute("data-stage", "startup");
+  expect(pageErrors).toEqual([]);
+});
+
+test("ignores startup action ids without throwing before a founder is selected", async ({
+  page,
+}) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.actionId = "unknown-action";
+    button.textContent = "Unknown action";
+    document.querySelector(".startup")?.append(button);
+  });
+  await page.locator("[data-action-id='unknown-action']").click();
+
+  await expect(page.locator("[data-stage]")).toHaveAttribute("data-stage", "startup");
+  expect(pageErrors).toEqual([]);
+});
+
 test("fits the operating screen in a landscape viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
@@ -268,5 +344,246 @@ test("disables custom recruitment offers until the salary is valid", async ({ pa
   await expect(submitOffer).toBeDisabled();
 
   await offerInput.fill("100");
+  await expect(submitOffer).toBeDisabled();
+
+  await offerInput.fill((await offerInput.getAttribute("min")) ?? "10000");
   await expect(submitOffer).toBeEnabled();
+});
+
+test("opens every operating panel from the control center and city map", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+
+  const consoleDialogs = [
+    { opener: "[data-open-dialog-id='company']", dialog: "company", text: "Staff Mix" },
+    { opener: "[data-open-dialog-id='culture']", dialog: "culture", text: "Culture Strategy" },
+    {
+      opener: "[data-open-dialog-id='recruitment']",
+      dialog: "recruitment",
+      text: "Recruitment Desk",
+    },
+    { opener: "[data-open-dialog-id='finance']", dialog: "finance", text: "Finance Desk" },
+    { opener: "[data-open-dialog-id='actions']", dialog: "actions", text: "Operations" },
+    { opener: "[data-open-dialog-id='events']", dialog: "events", text: "Initial choice" },
+  ];
+
+  for (const item of consoleDialogs) {
+    await page.locator(item.opener).click();
+    await expect(page.locator(`.workspace-dialog[data-dialog-id='${item.dialog}']`)).toContainText(
+      item.text,
+    );
+    await page.locator("[data-close-dialog]").click();
+  }
+
+  const zoneDialogs = [
+    { zone: "company", dialog: "company", text: "Founder Abilities" },
+    { zone: "bank", dialog: "finance", text: "Loan ¥80,000" },
+    { zone: "exchange", dialog: "finance", text: "IPO Requirements" },
+    { zone: "labor-market", dialog: "recruitment", text: "Ability hex" },
+    { zone: "court", dialog: "actions", text: "Operations" },
+    { zone: "policy-office", dialog: "culture", text: "Culture Strategy" },
+  ];
+
+  for (const item of zoneDialogs) {
+    await page.locator(`[data-zone-id='${item.zone}']`).click();
+    await expect(page.locator(`.workspace-dialog[data-dialog-id='${item.dialog}']`)).toContainText(
+      item.text,
+    );
+    await page.locator("[data-close-dialog]").click();
+  }
+});
+
+test("keeps secondary action buttons disabled until their prerequisites are met", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  await page.locator("[data-open-dialog-id='actions']").click();
+
+  await expect(page.locator("[data-action-id='file-insurance-claim']")).toBeDisabled();
+  await expect(page.locator("[data-action-id='sell-investment']")).toBeDisabled();
+  await expect(page.locator("[data-action-id='upgrade-car']")).toBeDisabled();
+  await expect(page.locator("[data-action-id='have-child']")).toBeDisabled();
+  await expect(page.locator("[data-action-id='run-ai-hiring-cycle']")).toBeDisabled();
+
+  await page.locator("[data-action-id='purchase-insurance']").click();
+  await expect(page.locator("[data-action-id='file-insurance-claim']")).toBeEnabled();
+  await page.locator("[data-action-id='file-insurance-claim']").click();
+  await expect(page.locator("[data-action-id='file-insurance-claim']")).toBeEnabled();
+
+  await page.locator("[data-action-id='make-investment']").click();
+  await expect(page.locator("[data-action-id='sell-investment']")).toBeEnabled();
+  await page.locator("[data-action-id='sell-investment']").click();
+  await expect(page.locator("[data-action-id='sell-investment']")).toBeDisabled();
+
+  await page.locator("[data-action-id='buy-car']").click();
+  await expect(page.locator("[data-action-id='upgrade-car']")).toBeEnabled();
+
+  await page.locator("[data-action-id='get-married']").click();
+  await expect(page.locator("[data-action-id='get-married']")).toBeDisabled();
+  await expect(page.locator("[data-action-id='have-child']")).toBeEnabled();
+
+  await page.locator("[data-action-id='toggle-ai-hiring']").click();
+  await expect(page.locator("[data-action-id='run-ai-hiring-cycle']")).toBeEnabled();
+});
+
+test("fits the operating screen in a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+
+  const metrics = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    bodyWidth: document.body.scrollWidth,
+    viewportWidth: window.innerWidth,
+    visibleButtonCount: Array.from(document.querySelectorAll("button")).filter((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }).length,
+    emptyVisibleButtonCount: Array.from(document.querySelectorAll("button")).filter((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && button.textContent?.trim() === "";
+    }).length,
+  }));
+
+  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 2);
+  expect(metrics.bodyWidth).toBeLessThanOrEqual(metrics.viewportWidth + 2);
+  expect(metrics.visibleButtonCount).toBeGreaterThan(0);
+  expect(metrics.emptyVisibleButtonCount).toBe(0);
+});
+
+test("reaches game over, records the score, and returns from leaderboard", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='technical-founder']").click();
+
+  for (let index = 0; index < 18; index += 1) {
+    await page.locator("[data-action-id='advance-30-days']").click();
+    if ((await page.locator("[data-stage='game-over']").count()) > 0) {
+      break;
+    }
+  }
+
+  await expect(page.locator("[data-stage='game-over']")).toBeVisible();
+  await expect(page.locator(".game-over")).toContainText("GAME OVER");
+  await expect(page.locator(".game-over-reason")).toContainText("Bankruptcy");
+  await expect(page.locator(".game-over-score-value")).toContainText(/\d/);
+  await expect(page.locator(".game-over-breakdown-row")).toHaveCount(3);
+
+  await page.locator("[data-action-id='view-leaderboard']").click();
+  await expect(page.locator("[data-stage='leaderboard']")).toBeVisible();
+  await expect(page.locator(".leaderboard")).toContainText("LEADERBOARD");
+  await expect(page.locator(".leaderboard-table tbody tr.is-current-game")).toHaveCount(1);
+
+  await page.locator("[data-action-id='back-to-game-over']").click();
+  await expect(page.locator("[data-stage='game-over']")).toBeVisible();
+});
+
+test("leaderboard UI restores valid localStorage entries and ignores corrupt entries", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "i-am-boss-leaderboard",
+      JSON.stringify([
+        {
+          id: "valid-history",
+          score: 500000,
+          daysPlayed: 300,
+          companyValuation: 200000,
+          playerWealth: 99700,
+          gameOverReason: "retirement",
+          date: "2026-01-01T00:00:00.000Z",
+          rank: 0,
+        },
+        {
+          id: "html-history",
+          score: 400000,
+          daysPlayed: 250,
+          companyValuation: 180000,
+          playerWealth: 90000,
+          gameOverReason: '<img src=x alt="bad-history">',
+          date: "2026-01-03T00:00:00.000Z",
+          rank: 0,
+        },
+        {
+          id: "negative-history",
+          score: -1,
+          daysPlayed: -10,
+          companyValuation: -1000,
+          playerWealth: -500,
+          gameOverReason: "bankruptcy",
+          date: "2026-01-02T00:00:00.000Z",
+          rank: 0,
+        },
+        {
+          id: "bad-history",
+          score: 100,
+          daysPlayed: 10,
+          companyValuation: "oops",
+        },
+      ]),
+    );
+  });
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='technical-founder']").click();
+
+  for (let index = 0; index < 18; index += 1) {
+    await page.locator("[data-action-id='advance-30-days']").click();
+    if ((await page.locator("[data-stage='game-over']").count()) > 0) {
+      break;
+    }
+  }
+
+  await page.locator("[data-action-id='view-leaderboard']").click();
+  await expect(page.locator("[data-stage='leaderboard']")).toBeVisible();
+  await expect(page.locator(".leaderboard-table")).toContainText("500,000");
+  await expect(page.locator(".leaderboard-table")).toContainText("Retirement");
+  await expect(page.locator(".leaderboard-table img")).toHaveCount(0);
+  await expect(page.locator(".leaderboard-table")).not.toContainText("-1");
+  await expect(page.locator(".leaderboard-table")).not.toContainText("oops");
+  await expect(page.locator(".leaderboard-table tbody tr.is-current-game")).toHaveCount(1);
+});
+
+test("captures ephemeral Playwright self-test screenshots for desktop and mobile QA", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  const startupDesktop = await page.screenshot({ fullPage: true });
+
+  await expect(page.locator("[data-choice-id]")).toHaveCount(3);
+  await expect(page.locator("[data-language-id='zh-CN']")).toHaveAttribute("aria-pressed", "true");
+
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  const operatingDesktop = await page.screenshot({ fullPage: true });
+
+  await page.locator("[data-open-dialog-id='finance']").click();
+  await page.locator("[data-loan-amount='80000']").click();
+  await page.locator("[data-close-dialog]").click();
+
+  await page.locator("[data-open-dialog-id='events']").click();
+  await page.locator("[data-event-filter='finance']").click();
+  await expect(page.locator(".event-feed [data-event-category='finance']")).toHaveCount(1);
+  await expect(page.locator(".event-feed [data-event-category='founder']")).toHaveCount(0);
+  const eventsFinanceFilter = await page.screenshot({ fullPage: true });
+  await page.locator("[data-close-dialog]").click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const operatingMobile = await page.screenshot({ fullPage: true });
+
+  const metrics = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 2);
+  expect(startupDesktop.length).toBeGreaterThan(0);
+  expect(operatingDesktop.length).toBeGreaterThan(0);
+  expect(eventsFinanceFilter.length).toBeGreaterThan(0);
+  expect(operatingMobile.length).toBeGreaterThan(0);
 });

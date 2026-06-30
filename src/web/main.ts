@@ -8,6 +8,7 @@ import {
 } from "../game/session";
 import { addToLeaderboard } from "../sim/leaderboard";
 import { createWebScreenModel, type WebEventCategoryFilter } from "./screen";
+import { escapeHtml } from "./html";
 import { DEFAULT_WEB_LANGUAGE, resolveWebLanguage, type WebLanguage } from "./i18n";
 import "./styles.css";
 
@@ -177,6 +178,10 @@ function handleRootClick(event: MouseEvent): void {
 
   const choiceId = button.dataset.choiceId;
   if (choiceId) {
+    if (!session.initialChoices.some((choice) => choice.id === choiceId)) {
+      return;
+    }
+
     session = selectInitialChoice(session, choiceId);
     activeDialog = undefined;
     render();
@@ -185,6 +190,10 @@ function handleRootClick(event: MouseEvent): void {
 
   const actionId = button.dataset.actionId;
   if (!actionId) {
+    return;
+  }
+
+  if (!session.selectedInitialChoiceId) {
     return;
   }
 
@@ -621,7 +630,7 @@ function createActionRequest(actionId: string, source?: HTMLButtonElement): Sess
   }
 
   if (actionId === "request-bank-loan") {
-    return { id: "request-bank-loan", amount: 80_000 };
+    return { id: "request-bank-loan", amount: readNumberData(source, "loanAmount") ?? 80_000 };
   }
 
   if (actionId === "request-policy-support") {
@@ -694,7 +703,7 @@ function createActionRequest(actionId: string, source?: HTMLButtonElement): Sess
     return { id: "have-child", childName: "Robin" };
   }
 
-  return { id: "advance-30-days" };
+  return { id: actionId } as never;
 }
 
 function renderRecruitmentPanel(
@@ -783,8 +792,8 @@ function renderRecruitmentPanel(
           <input
             class="offer-input"
             type="number"
-            min="100"
-            step="100"
+            min="${recruitment.customOffer.minimumSalary}"
+            step="1"
             inputmode="numeric"
             required
             value="${recruitment.customOffer.salary}"
@@ -940,22 +949,24 @@ function renderEventFeed(screen: ReturnType<typeof createWebScreenModel>): strin
             (item) => `
               <li
                 class="event-item"
-                data-event-type="${item.type}"
-                data-event-category="${item.category}"
-                data-event-severity="${item.severity}"
+                data-event-type="${escapeHtml(item.type)}"
+                data-event-category="${escapeHtml(item.category)}"
+                data-event-severity="${escapeHtml(item.severity)}"
                 data-event-day="${item.day}"
               >
                 <span class="event-meta">
                   <span class="event-day">D${item.day}</span>
-                  <span class="event-tag">${item.categoryLabel}</span>
-                  <span class="event-severity">${item.severityLabel}</span>
+                  <span class="event-tag">${escapeHtml(item.categoryLabel)}</span>
+                  <span class="event-severity">${escapeHtml(item.severityLabel)}</span>
                 </span>
-                <span class="event-text">${item.text}</span>
+                <span class="event-text">${escapeHtml(item.text)}</span>
               </li>
             `,
           )
           .join("")
-      : screen.eventFeed.map((entry) => `<li class="event-item">${entry}</li>`).join("");
+      : screen.eventFeed
+          .map((entry) => `<li class="event-item">${escapeHtml(entry)}</li>`)
+          .join("");
 
   return `${filterBar}<ol class="event-feed">${entries}</ol>`;
 }
@@ -1034,16 +1045,16 @@ function renderLeaderboardSection(
   ] as const;
 
   return `
-    <section class="leaderboard" aria-label="${leaderboard.title}">
-      <h2 class="leaderboard-title">${leaderboard.title}</h2>
+    <section class="leaderboard" aria-label="${escapeHtml(leaderboard.title)}">
+      <h2 class="leaderboard-title">${escapeHtml(leaderboard.title)}</h2>
       ${
         leaderboard.rows.length === 0
-          ? `<p class="leaderboard-empty">${leaderboard.emptyMessage}</p>`
+          ? `<p class="leaderboard-empty">${escapeHtml(leaderboard.emptyMessage)}</p>`
           : `<div class="leaderboard-table-wrapper">
             <table class="leaderboard-table">
               <thead>
                 <tr>
-                  ${headerKeys.map((key) => `<th>${leaderboard.headers[key]}</th>`).join("")}
+                  ${headerKeys.map((key) => `<th>${escapeHtml(leaderboard.headers[key])}</th>`).join("")}
                 </tr>
               </thead>
               <tbody>
@@ -1051,13 +1062,13 @@ function renderLeaderboardSection(
                   .map(
                     (row) => `
                       <tr class="${row.isCurrentGame ? "is-current-game" : ""}">
-                        <td>${row.rank}</td>
-                        <td class="leaderboard-score">${row.score}</td>
-                        <td>${row.daysPlayed}</td>
-                        <td>${row.companyValuation}</td>
-                        <td>${row.playerWealth}</td>
-                        <td>${row.gameOverReason}</td>
-                        <td>${row.date}</td>
+                        <td>${escapeHtml(row.rank)}</td>
+                        <td class="leaderboard-score">${escapeHtml(row.score)}</td>
+                        <td>${escapeHtml(row.daysPlayed)}</td>
+                        <td>${escapeHtml(row.companyValuation)}</td>
+                        <td>${escapeHtml(row.playerWealth)}</td>
+                        <td>${escapeHtml(row.gameOverReason)}</td>
+                        <td>${escapeHtml(row.date)}</td>
                       </tr>
                     `,
                   )
@@ -1068,7 +1079,7 @@ function renderLeaderboardSection(
       }
       <div class="leaderboard-actions">
         <button type="button" data-action-id="back-to-game-over">
-          ${leaderboard.backLabel}
+          ${escapeHtml(leaderboard.backLabel)}
         </button>
       </div>
     </section>
