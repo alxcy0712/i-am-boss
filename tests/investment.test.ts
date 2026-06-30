@@ -7,6 +7,7 @@ import {
   getPortfolioValue,
   getPortfolioSummary,
 } from "../src/sim/investment";
+import { deserializeGameState, serializeGameState } from "../src/harness/snapshot";
 import { createInitialGameState } from "../src/sim/state";
 
 describe("makeInvestment", () => {
@@ -32,6 +33,30 @@ describe("makeInvestment", () => {
 
     expect(result.success).toBe(false);
     expect(result.reason).toBe("below_minimum_investment");
+    expect(state.company.investments).toHaveLength(0);
+  });
+
+  it("rejects non-finite investment amounts", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const cashBefore = state.company.cash;
+
+    const nanResult = makeInvestment(state, { type: "stocks", amount: Number.NaN });
+    const infinityResult = makeInvestment(state, { type: "stocks", amount: Infinity });
+
+    expect(nanResult).toEqual({ success: false, reason: "invalid_investment_amount" });
+    expect(infinityResult).toEqual({ success: false, reason: "invalid_investment_amount" });
+    expect(state.company.cash).toBe(cashBefore);
+    expect(state.company.investments).toHaveLength(0);
+  });
+
+  it("rejects invalid investment types", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const cashBefore = state.company.cash;
+
+    const result = makeInvestment(state, { type: "invalid" as never, amount: 20_000 });
+
+    expect(result).toEqual({ success: false, reason: "invalid_investment_type" });
+    expect(state.company.cash).toBe(cashBefore);
     expect(state.company.investments).toHaveLength(0);
   });
 
@@ -122,6 +147,46 @@ describe("sellInvestment", () => {
     expect(result.reason).toBe("investment_not_found");
   });
 
+  it("sells corrupted investments without polluting cash", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const investResult = makeInvestment(state, { type: "stocks", amount: 20_000 });
+    const investment = investResult.investment!;
+    investment.currentValue = Number.NaN;
+    investment.amount = Infinity;
+    const cashBeforeSale = state.company.cash;
+
+    const result = sellInvestment(state, { investmentId: investment.id });
+
+    expect(result).toMatchObject({
+      success: true,
+      saleAmount: 0,
+      gain: 0,
+    });
+    expect(state.company.cash).toBe(cashBeforeSale);
+    expect(state.company.investments).toHaveLength(0);
+  });
+
+  it("removes investments with corrupted types without recording invalid events", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const investResult = makeInvestment(state, { type: "stocks", amount: 20_000 });
+    const investment = investResult.investment!;
+    const eventCount = state.events.length;
+    const eventLog = [...state.eventLog];
+    investment.type = "invalid" as never;
+
+    const result = sellInvestment(state, { investmentId: investment.id });
+
+    expect(result).toMatchObject({
+      success: true,
+      saleAmount: 20_000,
+      gain: 0,
+    });
+    expect(state.company.investments).toHaveLength(0);
+    expect(state.events).toHaveLength(eventCount);
+    expect(state.eventLog).toEqual(eventLog);
+    expect(() => deserializeGameState(serializeGameState(state))).not.toThrow();
+  });
+
   it("records investment sold game event", () => {
     const state = createInitialGameState({ seed: 1 });
     const investResult = makeInvestment(state, { type: "stocks", amount: 20_000 });
@@ -197,6 +262,33 @@ describe("processInvestmentReturns", () => {
     expect(result.investmentsProcessed).toBe(2);
   });
 
+  it("keeps corrupted investment returns finite", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.day = 30;
+    state.marketSentiment = Number.NaN;
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    state.company.investments[0].currentValue = Number.NaN;
+
+    const result = processInvestmentReturns(state, { seed: 42 });
+
+    expect(Number.isFinite(result.totalGain)).toBe(true);
+    expect(result.totalGain).toBe(0);
+    expect(Number.isFinite(state.company.investments[0].currentValue)).toBe(true);
+  });
+
+  it("skips investments with invalid types without polluting returns", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.day = 30;
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    state.company.investments[0].type = "invalid" as never;
+
+    const result = processInvestmentReturns(state, { seed: 42 });
+
+    expect(result.totalGain).toBe(0);
+    expect(result.investmentsProcessed).toBe(0);
+    expect(Number.isFinite(state.company.investments[0].currentValue)).toBe(true);
+  });
+
   it("higher market sentiment tends to produce better returns", () => {
     const state1 = createInitialGameState({ seed: 1 });
     state1.day = 30;
@@ -255,6 +347,16 @@ describe("calculateInvestmentReturn", () => {
 
     expect(result).toBeCloseTo(0.04);
   });
+
+  it("returns a finite expected return for non-finite market sentiment", () => {
+    const result = calculateInvestmentReturn({
+      type: "stocks",
+      marketSentiment: Number.NaN,
+      riskLevel: 0.6,
+    });
+
+    expect(Number.isFinite(result)).toBe(true);
+  });
 });
 
 describe("evaluateInvestmentRisk", () => {
@@ -302,6 +404,22 @@ describe("getPortfolioValue", () => {
 
     expect(getPortfolioValue(state)).toBe(35_000);
   });
+
+  it("returns finite value for corrupted investments", () => {
+    const state = createInitialGameState({ seed: 1 });
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    state.company.investments[0].currentValue = Number.NaN;
+
+    expect(getPortfolioValue(state)).toBe(0);
+  });
+
+  it("skips investments with invalid types in portfolio value", () => {
+    const state = createInitialGameState({ seed: 1 });
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    state.company.investments[0].type = "invalid" as never;
+
+    expect(getPortfolioValue(state)).toBe(0);
+  });
 });
 
 describe("getPortfolioSummary", () => {
@@ -331,5 +449,32 @@ describe("getPortfolioSummary", () => {
     const summary = getPortfolioSummary(state);
 
     expect(summary.totalValue).not.toBe(summary.totalInvested);
+  });
+
+  it("keeps portfolio summary finite for corrupted investments", () => {
+    const state = createInitialGameState({ seed: 1 });
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    state.company.investments[0].amount = Infinity;
+    state.company.investments[0].currentValue = Number.NaN;
+
+    const summary = getPortfolioSummary(state);
+
+    expect(Number.isFinite(summary.totalValue)).toBe(true);
+    expect(Number.isFinite(summary.totalInvested)).toBe(true);
+    expect(Number.isFinite(summary.totalGain)).toBe(true);
+    expect(Number.isFinite(summary.byType.stocks.value)).toBe(true);
+  });
+
+  it("skips investments with invalid types in portfolio summary", () => {
+    const state = createInitialGameState({ seed: 1 });
+    makeInvestment(state, { type: "stocks", amount: 20_000 });
+    state.company.investments[0].type = "invalid" as never;
+
+    const summary = getPortfolioSummary(state);
+
+    expect(summary.totalValue).toBe(0);
+    expect(summary.totalInvested).toBe(0);
+    expect(summary.totalGain).toBe(0);
+    expect(summary.byType.stocks.count).toBe(0);
   });
 });

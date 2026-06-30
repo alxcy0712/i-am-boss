@@ -12,9 +12,9 @@ export interface ScoreBreakdown {
 }
 
 export function calculateScoreBreakdown(input: ScoreInput): ScoreBreakdown {
-  const daysPoints = input.daysPlayed * 1;
-  const valuationPoints = input.companyValuation * 2;
-  const wealthPoints = input.playerWealth * 1;
+  const daysPoints = readFinite(input.daysPlayed) * 1;
+  const valuationPoints = readFinite(input.companyValuation) * 2;
+  const wealthPoints = readFinite(input.playerWealth) * 1;
   return {
     daysPoints,
     valuationPoints,
@@ -33,5 +33,17 @@ export function calculateWealthFromScore(
   daysPlayed: number,
   companyValuation: number,
 ): number {
+  if (
+    !Number.isFinite(score) ||
+    !Number.isFinite(daysPlayed) ||
+    !Number.isFinite(companyValuation)
+  ) {
+    return 0;
+  }
+
   return Math.max(0, score - daysPlayed - companyValuation * 2);
+}
+
+function readFinite(value: number): number {
+  return Number.isFinite(value) ? value : 0;
 }

@@ -21,12 +21,25 @@ export function calculateCompanyValuation(input: ValuationInput): ValuationResul
   if (input.isPublic) {
     return {
       kind: "listed_market",
-      value: input.listedMarketValue ?? 0,
+      value: readFinite(input.listedMarketValue, 0),
     };
   }
 
+  if (
+    !Number.isFinite(input.annualRevenue) ||
+    !Number.isFinite(input.profitMargin) ||
+    !Number.isFinite(input.reputation) ||
+    !Number.isFinite(input.marketSentiment)
+  ) {
+    return {
+      kind: "private_estimate",
+      value: 0,
+    };
+  }
+
+  const operationalCapability = readFinite(input.operationalCapability, 5);
   const capabilityBonus =
-    ((input.operationalCapability ?? 5) / 10) *
+    (operationalCapability / 10) *
     PROBABILITY_CONFIG.companyResources.operationalCapabilityRevenueMultiplier;
 
   const multiple =
@@ -39,4 +52,8 @@ export function calculateCompanyValuation(input: ValuationInput): ValuationResul
     kind: "private_estimate",
     value: input.annualRevenue * multiple * input.marketSentiment,
   };
+}
+
+function readFinite(value: number | undefined, fallback: number): number {
+  return value == null || !Number.isFinite(value) ? fallback : value;
 }

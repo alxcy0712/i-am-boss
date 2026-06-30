@@ -59,6 +59,23 @@ describe("evaluateGovernance", () => {
     expect(metrics.regulatoryCompliance).toBeLessThan(1);
     expect(metrics.overallScore).toBeLessThan(1);
   });
+
+  it("keeps governance metrics finite for corrupted company state", () => {
+    const state = publicState({
+      morale: Infinity,
+      reputation: Number.NaN,
+      lastDisclosureDay: Number.NaN,
+    });
+    state.day = Infinity;
+    state.society.legalCaseCount = Infinity;
+
+    const metrics = evaluateGovernance(state);
+
+    expect(Number.isFinite(metrics.shareholderSatisfaction)).toBe(true);
+    expect(Number.isFinite(metrics.disclosureCompliance)).toBe(true);
+    expect(Number.isFinite(metrics.regulatoryCompliance)).toBe(true);
+    expect(Number.isFinite(metrics.overallScore)).toBe(true);
+  });
 });
 
 describe("processShareholderRelations", () => {
@@ -111,6 +128,23 @@ describe("processShareholderRelations", () => {
 
     expect(typeof result.valuationImpact).toBe("number");
   });
+
+  it("keeps shareholder relation effects finite for corrupted company state", () => {
+    const state = publicState({
+      cash: Number.NaN,
+      morale: Infinity,
+      reputation: Number.NaN,
+      valuation: Infinity,
+    });
+
+    const result = processShareholderRelations(state, { seed: 42 });
+
+    expect(Number.isFinite(result.satisfactionDelta)).toBe(true);
+    expect(Number.isFinite(result.reputationDelta)).toBe(true);
+    expect(Number.isFinite(result.valuationImpact)).toBe(true);
+    expect(Number.isFinite(state.company.reputation)).toBe(true);
+    expect(Number.isFinite(state.company.valuation)).toBe(true);
+  });
 });
 
 describe("checkDisclosureCompliance", () => {
@@ -153,6 +187,22 @@ describe("checkDisclosureCompliance", () => {
     checkDisclosureCompliance(state);
 
     expect(state.company.lastDisclosureDay).toBe(60);
+  });
+
+  it("handles corrupted disclosure dates without non-finite penalties", () => {
+    const state = publicState({
+      valuation: Number.NaN,
+      lastDisclosureDay: Number.NaN,
+    });
+    state.day = Infinity;
+    const initialCash = state.company.cash;
+
+    const result = checkDisclosureCompliance(state);
+
+    expect(Number.isFinite(result.daysOverdue)).toBe(true);
+    expect(Number.isFinite(result.penalty)).toBe(true);
+    expect(Number.isFinite(state.company.lastDisclosureDay ?? 0)).toBe(true);
+    expect(state.company.cash).toBe(initialCash);
   });
 });
 
@@ -222,6 +272,35 @@ describe("evaluateDelistingRisk", () => {
     // At least one warning should trigger
     expect(["none", "low"]).toContain(result.riskLevel);
   });
+
+  it("treats corrupted public company values as delisting risks", () => {
+    const state = publicState({
+      cash: Number.NaN,
+      reputation: Number.NaN,
+      valuation: Number.NaN,
+    });
+
+    const result = evaluateDelistingRisk(state);
+
+    expect(result.riskLevel).toBe("critical");
+    expect(result.cashRisk).toBe(true);
+    expect(result.reputationRisk).toBe(true);
+    expect(result.valuationRisk).toBe(true);
+    expect(result.reasons).toHaveLength(3);
+  });
+
+  it("keeps delisting risk reasons finite for corrupted public company values", () => {
+    const state = publicState({
+      cash: Number.NaN,
+      reputation: Number.NaN,
+      valuation: Number.NaN,
+    });
+
+    const result = evaluateDelistingRisk(state);
+
+    expect(result.reasons.join(" ")).not.toContain("Infinity");
+    expect(result.reasons.join(" ")).not.toContain("NaN");
+  });
 });
 
 describe("applyGovernancePenalties", () => {
@@ -254,6 +333,15 @@ describe("applyGovernancePenalties", () => {
     expect(state1.company.cash).toBe(state2.company.cash);
   });
 
+  it("treats NaN severity as no penalty", () => {
+    const state = publicState({ cash: 500000, reputation: 6, valuation: 200000 });
+
+    applyGovernancePenalties(state, { reason: "test", severity: Number.NaN });
+
+    expect(state.company.cash).toBe(500000);
+    expect(state.company.reputation).toBe(6);
+  });
+
   it("records governance_penalty event", () => {
     const state = publicState();
 
@@ -264,6 +352,34 @@ describe("applyGovernancePenalties", () => {
     );
     expect(penaltyEvent).toBeDefined();
     expect(penaltyEvent!.category).toBe("market");
+  });
+
+  it("rejects blank penalty reasons without changing state or events", () => {
+    const state = publicState({ cash: 500000, reputation: 6, valuation: 200000 });
+    const eventCount = state.events.length;
+    const eventLog = [...state.eventLog];
+
+    applyGovernancePenalties(state, { reason: " ", severity: 0.5 });
+
+    expect(state.company.cash).toBe(500000);
+    expect(state.company.reputation).toBe(6);
+    expect(state.events).toHaveLength(eventCount);
+    expect(state.eventLog).toEqual(eventLog);
+  });
+
+  it("keeps penalties finite when severity and valuation are corrupted", () => {
+    const state = publicState({
+      cash: 500000,
+      reputation: 6,
+      valuation: Number.NaN,
+    });
+
+    applyGovernancePenalties(state, { reason: "test_penalty", severity: Infinity });
+
+    const penaltyEvent = state.events.find((e) => e.type === "governance_penalty");
+    expect(Number.isFinite(state.company.cash)).toBe(true);
+    expect(Number.isFinite(state.company.reputation)).toBe(true);
+    expect(Number.isFinite(penaltyEvent?.penalty ?? 0)).toBe(true);
   });
 });
 
@@ -333,5 +449,23 @@ describe("processMonthlyGovernance", () => {
 
     expect(state1.company.governanceMetrics).toEqual(state2.company.governanceMetrics);
     expect(state1.company.reputation).toBe(state2.company.reputation);
+  });
+
+  it("keeps monthly governance finite for corrupted public company state", () => {
+    const state = publicState({
+      cash: Number.NaN,
+      morale: Infinity,
+      reputation: Number.NaN,
+      valuation: Infinity,
+      lastDisclosureDay: Number.NaN,
+    });
+    state.day = Infinity;
+    state.society.legalCaseCount = Infinity;
+
+    processMonthlyGovernance(state, { seed: 42 });
+
+    expect(Number.isFinite(state.company.reputation)).toBe(true);
+    expect(Number.isFinite(state.company.valuation)).toBe(true);
+    expect(Number.isFinite(state.company.governanceMetrics?.overallScore ?? 0)).toBe(true);
   });
 });

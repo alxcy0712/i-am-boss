@@ -24,9 +24,9 @@ const CULTURE_OPERATIONAL_BONUS: Record<CompanyCulture, number> = {
 };
 
 export function calculateResourceCapacity(input: ResourceCapacityInput): number {
-  const cashScore = clamp(input.cash / 200_000, 0, 1) * 10;
-  const reputationScore = clamp(input.reputation / 10, 0, 1) * 10;
-  const headcountScore = clamp(input.headcount / 30, 0, 1) * 10;
+  const cashScore = clamp(readFinite(input.cash, 0) / 200_000, 0, 1) * 10;
+  const reputationScore = clamp(readFinite(input.reputation, 0) / 10, 0, 1) * 10;
+  const headcountScore = clamp(readFinite(input.headcount, 0) / 30, 0, 1) * 10;
 
   const weighted =
     cashScore * CONFIG.cashResourceWeight +
@@ -43,40 +43,38 @@ export function updateResources(state: GameState): void {
     reputation: state.company.reputation,
   });
 
-  const drift = capacity - state.company.resources;
+  const currentResources = readFinite(state.company.resources, 5);
+  const drift = capacity - currentResources;
   const adjustment = drift * 0.1;
 
-  state.company.resources = clamp(
-    Math.round((state.company.resources + adjustment) * 10) / 10,
-    0,
-    10,
-  );
+  state.company.resources = clamp(Math.round((currentResources + adjustment) * 10) / 10, 0, 10);
 
   updateOperationalCapability(state);
 }
 
 function updateOperationalCapability(state: GameState): void {
   const resourceContribution = state.company.resources / 10;
-  const headcountContribution = clamp(state.company.headcount / 25, 0, 1);
-  const cultureBonus = CULTURE_OPERATIONAL_BONUS[state.company.culture];
+  const headcountContribution = clamp(readFinite(state.company.headcount, 0) / 25, 0, 1);
+  const cultureBonus = CULTURE_OPERATIONAL_BONUS[state.company.culture] ?? 0;
 
   const targetCapability =
     (resourceContribution * 0.5 + headcountContribution * 0.3 + 0.2) * 10 + cultureBonus * 10;
 
-  const drift = clamp(targetCapability, 0, 10) - state.company.operationalCapability;
+  const currentCapability = readFinite(state.company.operationalCapability, 5);
+  const drift = clamp(targetCapability, 0, 10) - currentCapability;
   const adjustment = drift * 0.08;
 
   state.company.operationalCapability = clamp(
-    Math.round((state.company.operationalCapability + adjustment) * 10) / 10,
+    Math.round((currentCapability + adjustment) * 10) / 10,
     0,
     10,
   );
 }
 
 export function calculateOperationalEfficiency(input: OperationalEfficiencyInput): number {
-  const resourceFactor = input.resources / 10;
-  const headcountFactor = clamp(input.headcount / 20, 0, 1);
-  const cultureBonus = CULTURE_OPERATIONAL_BONUS[input.culture];
+  const resourceFactor = readFinite(input.resources, 0) / 10;
+  const headcountFactor = clamp(readFinite(input.headcount, 0) / 20, 0, 1);
+  const cultureBonus = CULTURE_OPERATIONAL_BONUS[input.culture] ?? 0;
 
   const efficiency = 0.5 + resourceFactor * 0.5 + headcountFactor * 0.3 + cultureBonus;
 
@@ -88,10 +86,18 @@ export function calculateOperationalEfficiency(input: OperationalEfficiencyInput
 }
 
 export function applyResourceCost(state: GameState, cost: number): boolean {
+  if (!Number.isFinite(cost) || cost < 0) {
+    return false;
+  }
+
   if (state.company.resources < cost) {
     return false;
   }
 
   state.company.resources = clamp(Math.round((state.company.resources - cost) * 10) / 10, 0, 10);
   return true;
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
 }

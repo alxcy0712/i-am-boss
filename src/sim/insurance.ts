@@ -3,6 +3,7 @@ import { recordGameEvent } from "./events";
 import type { GameState, InsurancePolicy, InsuranceType, RiskProfile } from "./types";
 
 const INSURANCE_CONFIG = PROBABILITY_CONFIG.insurance;
+const INSURANCE_TYPES = new Set<InsuranceType>(["legal", "operational", "market", "comprehensive"]);
 
 export interface InsuranceResult {
   purchased: boolean;
@@ -20,6 +21,10 @@ export function purchaseInsurance(
   state: GameState,
   input: { type: InsuranceType },
 ): InsuranceResult {
+  if (!INSURANCE_TYPES.has(input.type)) {
+    return { purchased: false, reason: "invalid_insurance_type" };
+  }
+
   const coverageType = INSURANCE_CONFIG.coverageTypes[input.type];
   const riskProfile = evaluateRiskProfile(state);
   const companySize = state.company.headcount;
@@ -71,14 +76,35 @@ export function processInsuranceClaim(
   state: GameState,
   input: { policyId: string; damageAmount: number },
 ): ClaimResult {
+  if (typeof input.policyId !== "string" || !input.policyId.trim()) {
+    return { approved: false, payout: 0, reason: "invalid_policy" };
+  }
+
   const policy = state.company.insurancePolicies.find((p) => p.id === input.policyId);
 
   if (!policy) {
     return { approved: false, payout: 0, reason: "policy_not_found" };
   }
 
+  if (typeof policy.id !== "string" || !policy.id.trim()) {
+    return { approved: false, payout: 0, reason: "invalid_policy" };
+  }
+
   if (!policy.active) {
     return { approved: false, payout: 0, reason: "policy_inactive" };
+  }
+
+  if (!Number.isFinite(input.damageAmount) || input.damageAmount < 0) {
+    return { approved: false, payout: 0, reason: "invalid_damage_amount" };
+  }
+
+  if (
+    !Number.isFinite(policy.coverage) ||
+    policy.coverage <= 0 ||
+    !Number.isFinite(policy.deductible) ||
+    policy.deductible < 0
+  ) {
+    return { approved: false, payout: 0, reason: "invalid_policy" };
   }
 
   if (input.damageAmount <= policy.deductible) {
@@ -108,16 +134,22 @@ export function calculateInsurancePremium(input: {
 }): number {
   const coverageType = INSURANCE_CONFIG.coverageTypes[input.type];
   const basePremium = coverageType.baseRate * INSURANCE_CONFIG.basePremiumRate * 10000;
-  const sizeMultiplier = 1 + Math.log2(Math.max(1, input.companySize)) * 0.1;
-  const riskLoad = 1 + (input.riskScore * (INSURANCE_CONFIG.premiumMultiplier - 1)) / 10;
+  const companySize = readPositiveFinite(input.companySize, 1);
+  const riskScore = clamp(readFinite(input.riskScore, 0), 0, 10);
+  const sizeMultiplier = 1 + Math.log2(Math.max(1, companySize)) * 0.1;
+  const riskLoad = 1 + (riskScore * (INSURANCE_CONFIG.premiumMultiplier - 1)) / 10;
 
   return Math.round(basePremium * sizeMultiplier * riskLoad);
 }
 
 export function evaluateRiskProfile(state: GameState): RiskProfile {
-  const legalRisk = Math.min(10, state.society.legalCaseCount * 2);
-  const operationalRisk = Math.max(0, 10 - state.company.operationalCapability);
-  const marketRisk = Math.max(0, 5 - state.marketSentiment * 5);
+  const legalCaseCount = readNonNegativeFinite(state.society.legalCaseCount, 0);
+  const operationalCapability = readFinite(state.company.operationalCapability, 5);
+  const marketSentiment = readFinite(state.marketSentiment, 1);
+
+  const legalRisk = Math.min(10, legalCaseCount * 2);
+  const operationalRisk = clamp(10 - operationalCapability, 0, 10);
+  const marketRisk = clamp(5 - marketSentiment * 5, 0, 10);
 
   const riskScore = Math.round(((legalRisk + operationalRisk + marketRisk) / 3) * 10) / 10;
 
@@ -144,4 +176,20 @@ export function evaluateRiskProfile(state: GameState): RiskProfile {
     },
     recommendations,
   };
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function readNonNegativeFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function readPositiveFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
