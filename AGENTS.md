@@ -57,6 +57,17 @@ Test files use `*.test.ts` and deterministic seeded RNG. Cover probability chang
 
 Use focused tests before full runs. For harness changes, include seed examples and verify deterministic checkpoint summaries.
 
+## Playwright Self-Test Workflow
+
+Use Playwright for browser-facing QA when changing `src/web/`, `src/ui/`, or player action wiring. Keep the pass focused on:
+- Logic flow: startup choice, language switching, recruitment, finance, event filtering, time advance, game over, and leaderboard.
+- UI layout: desktop `1280x720`, mobile/narrow viewport, dialog fit, text visibility, and horizontal overflow.
+- Button behavior: disabled prerequisites, enabled transitions, dialog open/close, finance, recruitment, employee, culture, and secondary actions.
+
+`npm run test:e2e` is the canonical browser self-test. Browser screenshots should stay ephemeral: capture them in memory for assertions, or use a temporary copy only while actively reviewing a layout issue and delete it after inspection.
+
+When Playwright finds a reproducible issue, add or update a focused browser assertion first, then make the smallest product change that satisfies it. Sync any workflow changes into this file and `docs/ai-iteration-guide.md`.
+
 ## Commit & Pull Request Guidelines
 
 History uses short subjects such as `init project`; keep commits imperative, for example `add hiring balance tests`. PRs should include gameplay impact, validation commands, seed examples, UI screenshots or clips, and linked issues.

@@ -42,6 +42,24 @@ describe("session actions", () => {
     expect(result.message).toContain("Advanced");
   });
 
+  it("locks city-map actions after game over", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 1 }), "technical-founder");
+
+    while (!session.gameOverReason) {
+      session = performSessionAction(session, { id: "advance-30-days" }).session;
+    }
+
+    const daysPlayed = session.summary?.daysPlayed;
+    expect(session.gameOverReason).toBe("bankruptcy");
+    expect(getSessionActions(session).every((action) => !action.enabled)).toBe(true);
+
+    const result = performSessionAction(session, { id: "advance-30-days" });
+
+    expect(result.message).toBe("Game over: bankruptcy");
+    expect(result.session.summary?.daysPlayed).toBe(daysPlayed);
+    expect(result.session.gameOverReason).toBe("bankruptcy");
+  });
+
   it("requests bank financing through a city-map action", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const before = session.summary?.cash ?? 0;
@@ -70,6 +88,26 @@ describe("session actions", () => {
     expect(result.session.summary?.eventLog.at(-1)).toMatch(/Hired|Hiring failed/);
   });
 
+  it("rejects unknown runtime actions without mutating the session", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+
+    const result = performSessionAction(session, { id: "unknown-action" } as never);
+
+    expect(result.message).toBe("Invalid action");
+    expect(result.session.summary?.daysPlayed).toBe(session.summary?.daysPlayed);
+    expect(result.session.summary?.headcount).toBe(session.summary?.headcount);
+    expect(result.session.summary?.eventLog).toEqual(session.summary?.eventLog);
+  });
+
+  it("rejects unknown runtime actions before startup without throwing", () => {
+    const session = createGameSession({ seed: 21 });
+
+    const result = performSessionAction(session, { id: "unknown-action" } as never);
+
+    expect(result.message).toBe("Invalid action");
+    expect(result.session).toBe(session);
+  });
+
   it("previews a candidate, rejects low offers, and advances to the next candidate", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const preview = previewRecruitmentCandidate(session);
@@ -88,6 +126,34 @@ describe("session actions", () => {
     expect(skipped.message).toContain("Skipped candidate");
     expect(skipped.session.candidateCursor).toBe((session.candidateCursor ?? 0) + 1);
     expect(nextPreview.seed).not.toBe(preview.seed);
+  });
+
+  it("rejects non-finite recruitment offers without throwing", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 1 }), "technical-founder");
+
+    const result = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: Infinity,
+      equityPercent: 1,
+    });
+
+    expect(result.message).toContain("invalid offer");
+    expect(result.session.summary?.headcount).toBe(session.summary?.headcount);
+    expect(result.session.candidateCursor).toBe(session.candidateCursor);
+  });
+
+  it("rejects out-of-range recruitment equity without throwing", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 1 }), "technical-founder");
+
+    const result = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: -0.01,
+    });
+
+    expect(result.message).toContain("invalid offer");
+    expect(result.session.summary?.headcount).toBe(session.summary?.headcount);
+    expect(result.session.candidateCursor).toBe(session.candidateCursor);
   });
 
   it("limits next-candidate skips to ten and resets the limit after advancing time", () => {
@@ -134,6 +200,47 @@ describe("session actions", () => {
     expect(hired.session.candidateCursor).toBe(beforeCursor + 1);
   });
 
+  it("exhausts recruitment after hiring the final available candidate", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+    session.state.company.reputation = 10;
+    session.state.company.culture = "adaptive";
+    session.state.company.cash = 10_000_000;
+
+    for (let index = 0; index < 10; index += 1) {
+      session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    }
+
+    const finalHire = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    });
+
+    expect(finalHire.message).toContain("Hired");
+    expect(finalHire.session.candidateSkipCount).toBe(11);
+    expect(
+      getSessionActions(finalHire.session).find((action) => action.id === "recruit-candidate")
+        ?.enabled,
+    ).toBe(false);
+
+    const blocked = performSessionAction(finalHire.session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    });
+
+    expect(blocked.message).toBe("No candidates remaining");
+    expect(blocked.session.summary?.headcount).toBe(finalHire.session.summary?.headcount);
+
+    const advanced = performSessionAction(blocked.session, { id: "advance-30-days" }).session;
+    expect(
+      getSessionActions(advanced).find((action) => action.id === "recruit-candidate")?.enabled,
+    ).toBe(true);
+  });
+
   it("changes company culture through a city-map action", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const result = performSessionAction(session, {
@@ -145,6 +252,48 @@ describe("session actions", () => {
     expect(result.session.state?.company.culturePressure).toBe(9);
     expect(result.session.summary?.eventLog.at(-1)).toBe("Culture changed: wolf");
     expect(result.message).toBe("Culture changed: wolf");
+  });
+
+  it("rejects invalid company culture action payloads", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    const previous = {
+      culture: session.state?.company.culture,
+      morale: session.state?.company.morale,
+      reputation: session.state?.company.reputation,
+    };
+
+    const result = performSessionAction(session, {
+      id: "change-culture",
+      culture: undefined as never,
+    });
+
+    expect(result.message).toBe("Invalid culture");
+    expect(result.session.state?.company).toMatchObject(previous);
+  });
+
+  it("ignores company culture actions that repeat the current culture", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    const previous = {
+      cash: session.state?.company.cash,
+      culture: session.state?.company.culture,
+      morale: session.state?.company.morale,
+      reputation: session.state?.company.reputation,
+      eventLog: session.summary?.eventLog,
+    };
+
+    const result = performSessionAction(session, {
+      id: "change-culture",
+      culture: "adaptive",
+    });
+
+    expect(result.message).toBe("Culture unchanged");
+    expect(result.session.state?.company).toMatchObject({
+      cash: previous.cash,
+      culture: previous.culture,
+      morale: previous.morale,
+      reputation: previous.reputation,
+    });
+    expect(result.session.summary?.eventLog).toEqual(previous.eventLog);
   });
 
   it("terminates an employee through a session action and pays severance", () => {
@@ -215,6 +364,30 @@ describe("session actions", () => {
     );
   });
 
+  it("rejects non-finite employee salary raises without changing payroll", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+
+    const employee = hireEmployee(session.state, {
+      candidate: createCandidate("engineer"),
+      salary: 9_000,
+      equityPercent: 0.2,
+    });
+    const monthlyBurnBefore = session.state.company.monthlyBurn;
+
+    const result = performSessionAction(session, {
+      id: "raise-employee-salary",
+      employeeId: employee.id,
+      salary: Number.NaN,
+    });
+
+    expect(result.message).toBe("Invalid salary");
+    expect(result.session.state?.company.employees[0]?.salary).toBe(9_000);
+    expect(result.session.state?.company.monthlyBurn).toBe(monthlyBurnBefore);
+  });
+
   it("makes an investment through a session action", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const cashBefore = session.summary?.cash ?? 0;
@@ -230,6 +403,45 @@ describe("session actions", () => {
     expect(result.session.state?.company.investments).toHaveLength(1);
     expect(result.session.summary?.investmentCount).toBe(1);
     expect(result.session.summary?.cash).toBeLessThan(cashBefore);
+  });
+
+  it("rejects invalid investment action payloads without mutating cash", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    const cashBefore = session.summary?.cash ?? 0;
+
+    const result = performSessionAction(session, {
+      id: "make-investment",
+      investmentType: "invalid" as never,
+      amount: 20_000,
+    });
+
+    expect(result.message).toBe("Investment failed: invalid_investment_type");
+    expect(result.session.summary?.cash).toBe(cashBefore);
+    expect(result.session.state?.company.investments).toHaveLength(0);
+  });
+
+  it("rejects invalid insurance action payloads without throwing", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    const cashBefore = session.summary?.cash ?? 0;
+
+    const result = performSessionAction(session, {
+      id: "purchase-insurance",
+      insuranceType: "invalid" as never,
+    });
+
+    expect(result.message).toBe("Insurance purchase failed: invalid_insurance_type");
+    expect(result.session.summary?.cash).toBe(cashBefore);
+    expect(result.session.state?.company.insurancePolicies).toHaveLength(0);
+  });
+
+  it("rejects AI hiring cycle actions while AI hiring is disabled", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+
+    const result = performSessionAction(session, { id: "run-ai-hiring-cycle" });
+
+    expect(result.message).toBe("AI hiring disabled");
+    expect(result.session.summary?.headcount).toBe(session.summary?.headcount);
+    expect(result.session.summary?.eventLog).toEqual(session.summary?.eventLog);
   });
 
   it("sells an investment through a session action", () => {

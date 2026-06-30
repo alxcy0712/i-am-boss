@@ -36,6 +36,21 @@ describe("calculateScoreBreakdown", () => {
     });
     expect(breakdown.totalScore).toBe(0);
   });
+
+  it("treats non-finite inputs as zero-point components", () => {
+    const breakdown = calculateScoreBreakdown({
+      daysPlayed: Number.NaN,
+      companyValuation: Infinity,
+      playerWealth: Number.NaN,
+    });
+
+    expect(breakdown).toEqual({
+      daysPoints: 0,
+      valuationPoints: 0,
+      wealthPoints: 0,
+      totalScore: 0,
+    });
+  });
 });
 
 describe("calculateWealthFromScore", () => {
@@ -47,5 +62,11 @@ describe("calculateWealthFromScore", () => {
   it("clamps to zero when derived wealth would be negative", () => {
     const wealth = calculateWealthFromScore(10, 100, 50);
     expect(wealth).toBe(0);
+  });
+
+  it("returns zero when score inputs are non-finite", () => {
+    expect(calculateWealthFromScore(Number.NaN, 100, 50)).toBe(0);
+    expect(calculateWealthFromScore(100, Number.NaN, 50)).toBe(0);
+    expect(calculateWealthFromScore(100, 10, Infinity)).toBe(0);
   });
 });

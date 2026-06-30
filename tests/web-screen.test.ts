@@ -133,8 +133,10 @@ describe("createWebScreenModel", () => {
           customOffer: {
             inputLabel: string;
             salary: number;
+            minimumSalary: number;
             equityPercent: number;
             actionId: string;
+            enabled: boolean;
           };
           offerOptions: Array<{
             id: string;
@@ -172,7 +174,12 @@ describe("createWebScreenModel", () => {
     expect(recruitment?.abilityChart.polygonPoints.split(" ")).toHaveLength(6);
     expect(recruitment?.customOffer.inputLabel).toBe("Offer");
     expect(recruitment?.customOffer.salary).toBeGreaterThan(0);
+    expect(recruitment?.customOffer.minimumSalary).toBeGreaterThan(0);
+    expect(recruitment?.customOffer.salary).toBeGreaterThanOrEqual(
+      recruitment?.customOffer.minimumSalary ?? 0,
+    );
     expect(recruitment?.customOffer.actionId).toBe("recruit-candidate");
+    expect(recruitment?.customOffer.enabled).toBe(true);
     expect(recruitment?.offerOptions).toHaveLength(1);
     expect(recruitment?.offerOptions[0]).toMatchObject({
       id: "next-candidate",
@@ -206,6 +213,33 @@ describe("createWebScreenModel", () => {
       enabled: true,
       remaining: 10,
     });
+  });
+
+  it("disables recruitment offers after hiring the final available candidate", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 9 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+    session.state.company.reputation = 10;
+    session.state.company.culture = "adaptive";
+
+    for (let index = 0; index < 10; index += 1) {
+      session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    }
+
+    const finalHire = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    }).session;
+    const screen = createWebScreenModel(finalHire, { language: "en" });
+
+    expect(screen.recruitment?.customOffer.enabled).toBe(false);
+    expect(screen.recruitment?.offerOptions[0]).toMatchObject({
+      enabled: false,
+      remaining: 0,
+    });
+    expect(screen.mapTiles.find((tile) => tile.zoneId === "labor-market")?.enabled).toBe(false);
   });
 
   it("shows localized staff mix and payroll metrics after hiring", () => {
@@ -434,6 +468,21 @@ describe("createWebScreenModel", () => {
     });
   });
 
+  it("enables loan access when resources compensate for lower reputation", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 9 }), "technical-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+    session.state.company.reputation = 3;
+    session.state.company.resources = 8;
+    session.state.company.annualRevenue = 200_000;
+    session.state.company.monthlyBurn = 5_000;
+
+    const screen = createWebScreenModel(session, { language: "en" });
+
+    expect(screen.finance?.loanOption.eligible).toBe(true);
+  });
+
   it("shows listed market status after a successful IPO", () => {
     const mature = selectInitialChoice(createGameSession({ seed: 9 }), "network-founder");
     if (!mature.state) {
@@ -643,5 +692,30 @@ describe("createWebScreenModel", () => {
       { id: "finance", label: "FINANCE", count: 1, selected: false },
     ]);
     expect(screen.eventItems.map((item) => item.category)).toEqual(["founder", "finance"]);
+  });
+
+  it("keeps game-over score display readable when summary metrics are polluted", () => {
+    const session = selectInitialChoice(createGameSession({ seed: 9 }), "network-founder");
+    if (!session.summary) {
+      throw new Error("Expected selected session to have summary");
+    }
+    session.gameOverReason = "bankruptcy";
+    session.summary.gameOverReason = "bankruptcy";
+    session.summary.score = Number.NaN;
+    session.summary.daysPlayed = Number.NaN;
+    session.summary.companyValuation = Infinity;
+    session.summary.playerWealth = Number.NaN;
+    session.summary.headcount = Number.NaN;
+
+    const screen = createWebScreenModel(session, { language: "en" });
+    const visibleValues = [
+      screen.gameOverScreen?.finalScore,
+      ...(screen.gameOverScreen?.scoreRows ?? []).flatMap((row) => [row.value, row.points]),
+      ...(screen.gameOverScreen?.summaryRows ?? []).map((row) => row.value),
+    ];
+
+    expect(visibleValues.every((value) => !String(value).includes("NaN"))).toBe(true);
+    expect(visibleValues.every((value) => !String(value).includes("Infinity"))).toBe(true);
+    expect(visibleValues.every((value) => !String(value).includes("∞"))).toBe(true);
   });
 });

@@ -77,6 +77,13 @@ npm run build:web
 npm run test:e2e
 ```
 
+`npm run test:e2e` 覆盖启动、语言切换、主经营循环、控制中心弹窗、城市地图入口、按钮前置条件、移动端横向溢出、game over 和排行榜。浏览器 QA 截图采用阅后即焚策略：
+
+- 自动化测试使用内存截图断言，截图 buffer 不落盘。
+- 人工排查布局问题时，可以临时保存副本，检查后删除。
+
+检查 UI 改动时，重点确认桌面和移动经营界面的按钮、HUD、城市地图、弹窗和事件筛选没有重叠、裁切或空白状态。
+
 平衡验证：
 
 ```bash
@@ -85,6 +92,14 @@ npm run harness -- --seed 7 --days 200 --checkpointIntervalDays 90
 npm run balance -- --seedStart 1 --runs 10 --days 365 --checkpointIntervalDays 90
 npm run probability:audit
 ```
+
+## 最新 QA 记录
+
+2026-06-30 Playwright 自测覆盖：
+
+- 新增浏览器断言：所有控制中心弹窗、6 个城市地图区域、二级动作 disabled/enabled 前置条件、移动端横向溢出、game over、排行榜返回路径。
+- 新增内存截图检查：启动页桌面、经营页桌面、事件金融筛选、经营页移动端。
+- 验证入口：`npm run build:web` 和 `npm run test:e2e`。
 
 ## 性能原则
 

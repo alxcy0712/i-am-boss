@@ -3,6 +3,7 @@ import {
   hireEmployee,
   processPromotions,
 } from "../src/sim/employee-lifecycle";
+import { deserializeGameState, serializeGameState } from "../src/harness/snapshot";
 import type { Candidate } from "../src/sim/hiring";
 import { createInitialGameState } from "../src/sim/state";
 
@@ -90,5 +91,51 @@ describe("employee promotions", () => {
 
     expect(state.company.employees[0]?.monthsTenure).toBe(2);
     expect(state.company.cash).toBe(previousCash);
+  });
+
+  it("skips promotion when employee salary is non-finite", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.headcount = 12;
+    const employee = hireEmployee(state, {
+      candidate: candidate({ communication: 10, eq: 10, stressTolerance: 10 }),
+      salary: 20_000,
+      equityPercent: 0,
+    });
+    employee.monthsTenure = 12;
+    employee.salary = Number.NaN;
+    const previousBurn = state.company.monthlyBurn;
+
+    const promoted = processPromotions(state);
+
+    expect(promoted).toEqual([]);
+    expect(employee.managementLevel).toBe("individual");
+    expect(state.company.monthlyBurn).toBe(previousBurn);
+  });
+
+  it("promotes employees with corrupted roles without recording invalid events", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.headcount = 12;
+    const employee = hireEmployee(state, {
+      candidate: candidate({ communication: 10, eq: 10, stressTolerance: 10 }),
+      salary: 20_000,
+      equityPercent: 0,
+    });
+    employee.monthsTenure = 12;
+    const previousBurn = state.company.monthlyBurn;
+    const eventCount = state.events.length;
+    const eventLog = [...state.eventLog];
+    employee.role = "invalid" as never;
+
+    const promoted = processPromotions(state);
+
+    expect(promoted).toEqual([employee]);
+    expect(employee.managementLevel).toBe("middle");
+    expect(employee.salary).toBeGreaterThan(20_000);
+    expect(state.company.monthlyBurn).toBeGreaterThan(previousBurn);
+    expect(state.events).toHaveLength(eventCount);
+    expect(state.eventLog).toEqual(eventLog);
+
+    employee.role = "engineer";
+    expect(() => deserializeGameState(serializeGameState(state))).not.toThrow();
   });
 });

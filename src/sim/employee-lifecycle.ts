@@ -3,7 +3,9 @@ import { recordGameEvent } from "./events";
 import type { Candidate } from "./hiring";
 import { calculateResignationRisk } from "./resignation";
 import { clamp, createSeededRng } from "./rng";
-import type { EmployeeState, GameState, ManagementLevel } from "./types";
+import type { CompanyRole, EmployeeState, GameState, ManagementLevel } from "./types";
+
+const COMPANY_ROLES = new Set<CompanyRole>(["engineer", "product", "sales", "finance", "hr"]);
 
 export interface HireEmployeeInput {
   candidate: Candidate;
@@ -12,6 +14,16 @@ export interface HireEmployeeInput {
 }
 
 export function hireEmployee(state: GameState, input: HireEmployeeInput): EmployeeState {
+  if (!Number.isFinite(input.salary)) {
+    throw new Error("Invalid salary: expected a finite amount");
+  }
+  if (input.salary <= 0) {
+    throw new Error("Invalid salary: expected a positive amount");
+  }
+  if (!Number.isFinite(input.equityPercent) || input.equityPercent < 0 || input.equityPercent > 1) {
+    throw new Error("Invalid equity: expected a percentage between 0 and 1");
+  }
+
   const employee: EmployeeState = {
     id: `${input.candidate.role}-${state.day}-${state.company.employees.length + 1}`,
     role: input.candidate.role,
@@ -32,7 +44,7 @@ export function hireEmployee(state: GameState, input: HireEmployeeInput): Employ
 
   state.company.employees.push(employee);
   state.company.headcount += 1;
-  state.company.monthlyBurn += input.salary;
+  state.company.monthlyBurn = readNonNegativeFinite(state.company.monthlyBurn, 0) + input.salary;
   recordGameEvent(state, {
     type: "employee_hired",
     role: employee.role,
@@ -43,8 +55,8 @@ export function hireEmployee(state: GameState, input: HireEmployeeInput): Employ
 
 export function runMonthlyPayroll(state: GameState): number {
   const payroll = state.company.employees.reduce((total, employee) => {
-    employee.monthsTenure += 1;
-    return total + employee.salary;
+    employee.monthsTenure = readNonNegativeFinite(employee.monthsTenure, 0) + 1;
+    return total + readNonNegativeFinite(employee.salary, 0);
   }, 0);
 
   state.company.cash -= payroll;
@@ -56,6 +68,13 @@ export function runMonthlyPayroll(state: GameState): number {
 }
 
 export function advanceEmployeeTenure(state: GameState, input: { months: number }): void {
+  if (!Number.isFinite(input.months)) {
+    throw new Error("Invalid tenure advance: expected a finite month count");
+  }
+  if (input.months < 0) {
+    throw new Error("Invalid tenure advance: expected a non-negative month count");
+  }
+
   for (const employee of state.company.employees) {
     employee.monthsTenure += input.months;
   }
@@ -65,6 +84,10 @@ export function processPromotions(state: GameState): EmployeeState[] {
   const promoted: EmployeeState[] = [];
 
   for (const employee of state.company.employees) {
+    if (!Number.isFinite(employee.salary)) {
+      continue;
+    }
+
     const nextLevel = getNextManagementLevel(state, employee);
     if (!nextLevel) {
       continue;
@@ -78,12 +101,14 @@ export function processPromotions(state: GameState): EmployeeState[] {
 }
 
 export function calculateSeverance(input: { salary: number; monthsTenure: number }): number {
-  const serviceYears = Math.ceil(input.monthsTenure / 12);
+  const salary = readNonNegativeFinite(input.salary, 0);
+  const monthsTenure = readNonNegativeFinite(input.monthsTenure, 0);
+  const serviceYears = Math.ceil(monthsTenure / 12);
   const severanceMonths = Math.max(
     PROBABILITY_CONFIG.employeeLifecycle.minimumSeveranceMonths,
     serviceYears * PROBABILITY_CONFIG.employeeLifecycle.severanceMonthsPerServiceYear,
   );
-  return input.salary * severanceMonths;
+  return salary * severanceMonths;
 }
 
 export function terminateEmployee(state: GameState, employeeId: string): number {
@@ -96,15 +121,18 @@ export function terminateEmployee(state: GameState, employeeId: string): number 
     salary: employee.salary,
     monthsTenure: employee.monthsTenure,
   });
+  const salary = readNonNegativeFinite(employee.salary, 0);
   state.company.employees = state.company.employees.filter((item) => item.id !== employeeId);
   state.company.headcount -= 1;
-  state.company.monthlyBurn -= employee.salary;
+  state.company.monthlyBurn -= salary;
   state.company.cash -= severance;
-  recordGameEvent(state, {
-    type: "employee_terminated",
-    role: employee.role,
-    severance,
-  });
+  if (COMPANY_ROLES.has(employee.role)) {
+    recordGameEvent(state, {
+      type: "employee_terminated",
+      role: employee.role,
+      severance,
+    });
+  }
   return severance;
 }
 
@@ -124,7 +152,15 @@ export function raiseEmployeeSalary(
     return undefined;
   }
 
+  if (input.salary !== undefined && !Number.isFinite(input.salary)) {
+    return undefined;
+  }
+
   const previousSalary = employee.salary;
+  if (!Number.isFinite(previousSalary)) {
+    return undefined;
+  }
+
   const defaultSalary = Math.round(
     previousSalary * (1 + PROBABILITY_CONFIG.employeeLifecycle.salaryRaiseRate),
   );
@@ -142,12 +178,14 @@ export function raiseEmployeeSalary(
 
   employee.salary = salary;
   state.company.monthlyBurn += delta;
-  recordGameEvent(state, {
-    type: "employee_salary_adjusted",
-    role: employee.role,
-    previousSalary,
-    salary,
-  });
+  if (COMPANY_ROLES.has(employee.role)) {
+    recordGameEvent(state, {
+      type: "employee_salary_adjusted",
+      role: employee.role,
+      previousSalary,
+      salary,
+    });
+  }
 
   return {
     employee,
@@ -173,7 +211,7 @@ export function processResignations(state: GameState, input: { seed: number }): 
     });
 
     if (risk > rng.next()) {
-      resigned.push(employee);
+      resigned.push(createFinitePayrollEmployee(employee));
     }
   }
 
@@ -183,7 +221,10 @@ export function processResignations(state: GameState, input: { seed: number }): 
       (employee) => !resignedIds.has(employee.id),
     );
     state.company.headcount -= resigned.length;
-    state.company.monthlyBurn -= resigned.reduce((total, employee) => total + employee.salary, 0);
+    state.company.monthlyBurn -= resigned.reduce(
+      (total, employee) => total + readNonNegativeFinite(employee.salary, 0),
+      0,
+    );
     recordGameEvent(state, {
       type: "employees_resigned",
       count: resigned.length,
@@ -240,6 +281,10 @@ function promoteEmployee(
   employee: EmployeeState,
   nextLevel: ManagementLevel,
 ): void {
+  if (!Number.isFinite(employee.salary)) {
+    return;
+  }
+
   const raise = Math.round(employee.salary * PROBABILITY_CONFIG.promotion.salaryRaiseRate);
   employee.salary += raise;
   employee.managementLevel = nextLevel;
@@ -248,9 +293,25 @@ function promoteEmployee(
     10,
     state.company.morale + PROBABILITY_CONFIG.promotion.moraleGain,
   );
-  recordGameEvent(state, {
-    type: "employee_promoted",
-    role: employee.role,
-    managementLevel: nextLevel,
-  });
+  if (COMPANY_ROLES.has(employee.role)) {
+    recordGameEvent(state, {
+      type: "employee_promoted",
+      role: employee.role,
+      managementLevel: nextLevel,
+    });
+  }
+}
+
+function readNonNegativeFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function createFinitePayrollEmployee(employee: EmployeeState): EmployeeState {
+  const salary = readNonNegativeFinite(employee.salary, 0);
+  return {
+    ...employee,
+    salary,
+    targetSalary: readNonNegativeFinite(employee.targetSalary, salary),
+    monthsTenure: readNonNegativeFinite(employee.monthsTenure, 0),
+  };
 }

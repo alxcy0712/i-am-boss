@@ -47,6 +47,8 @@ npm run balance -- --seedStart 1 --runs 10 --days 365 --checkpointIntervalDays 9
 npm run probability:audit
 ```
 
+`npm run test:e2e` 会使用内存截图检查桌面和移动端布局，不保留本地截图产物。
+
 ## 项目结构
 
 ```text

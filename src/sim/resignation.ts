@@ -1,5 +1,5 @@
 import { PROBABILITY_CONFIG } from "../config/probabilities";
-import { calculateCultureFit } from "./culture-fit";
+import { calculateCultureFit, isCompanyCulture } from "./culture-fit";
 import { clamp } from "./rng";
 import type { CompanyCulture } from "./types";
 
@@ -14,23 +14,37 @@ export interface ResignationRiskInput {
 }
 
 export function calculateResignationRisk(input: ResignationRiskInput): number {
+  const config = PROBABILITY_CONFIG.resignation;
+  if (
+    !Number.isFinite(input.salary) ||
+    !Number.isFinite(input.targetSalary) ||
+    input.targetSalary <= 0 ||
+    !Number.isFinite(input.stressTolerance) ||
+    !Number.isFinite(input.culturePressure) ||
+    !Number.isFinite(input.morale)
+  ) {
+    return config.baseRisk;
+  }
+
   const salaryGap = clamp((input.targetSalary - input.salary) / input.targetSalary, 0, 1);
   const pressureGap = clamp((input.culturePressure - input.stressTolerance) / 10, 0, 1);
   const moraleGap = clamp((10 - input.morale) / 10, 0, 1);
+  const personality = Number.isFinite(input.personality)
+    ? clamp(input.personality as number, 0, 10)
+    : undefined;
   const cultureMismatch =
-    input.culture !== undefined && input.personality !== undefined
+    isCompanyCulture(input.culture) && personality !== undefined
       ? 1 -
         calculateCultureFit({
           culture: input.culture,
-          personality: input.personality,
+          personality,
         })
       : 0;
 
-  const config = PROBABILITY_CONFIG.resignation;
   const personalityFactor =
-    input.personality !== undefined
+    personality !== undefined
       ? config.lowPersonalitySalaryWeight +
-        (input.personality / 10) *
+        (personality / 10) *
           (config.highPersonalitySalaryWeight - config.lowPersonalitySalaryWeight)
       : 1;
 

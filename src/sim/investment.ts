@@ -4,6 +4,13 @@ import { createSeededRng } from "./rng";
 import type { GameState, Investment, InvestmentType } from "./types";
 
 const INVESTMENT_CONFIG = PROBABILITY_CONFIG.investment;
+const INVESTMENT_TYPES = new Set<InvestmentType>([
+  "stocks",
+  "bonds",
+  "real_estate",
+  "venture",
+  "crypto",
+]);
 
 export interface InvestmentResult {
   success: boolean;
@@ -34,6 +41,14 @@ export function makeInvestment(
   input: { type: InvestmentType; amount: number },
 ): InvestmentResult {
   const config = INVESTMENT_CONFIG;
+
+  if (!INVESTMENT_TYPES.has(input.type)) {
+    return { success: false, reason: "invalid_investment_type" };
+  }
+
+  if (!Number.isFinite(input.amount)) {
+    return { success: false, reason: "invalid_investment_amount" };
+  }
 
   if (input.amount < config.minimumInvestment) {
     return { success: false, reason: "below_minimum_investment" };
@@ -90,19 +105,22 @@ export function sellInvestment(
   }
 
   const investment = state.company.investments[index];
-  const saleAmount = Math.round(investment.currentValue);
-  const gain = saleAmount - investment.amount;
+  const saleAmount = Math.round(readNonNegativeFinite(investment.currentValue, 0));
+  const originalAmount = readNonNegativeFinite(investment.amount, saleAmount);
+  const gain = saleAmount - originalAmount;
 
   state.company.cash += saleAmount;
   state.company.investments.splice(index, 1);
 
-  recordGameEvent(state, {
-    type: "investment_sold",
-    investmentId: investment.id,
-    investmentType: investment.type,
-    saleAmount,
-    gain,
-  });
+  if (isInvestmentType(investment.type)) {
+    recordGameEvent(state, {
+      type: "investment_sold",
+      investmentId: investment.id,
+      investmentType: investment.type,
+      saleAmount,
+      gain,
+    });
+  }
 
   return { success: true, saleAmount, gain };
 }
@@ -117,12 +135,20 @@ export function processInvestmentReturns(
 
   const rng = createSeededRng(input.seed + state.day);
   let totalGain = 0;
+  let investmentsProcessed = 0;
 
   for (const investment of state.company.investments) {
+    const currentValue = readNonNegativeFinite(investment.currentValue, 0);
+    investment.currentValue = currentValue;
+    if (!isInvestmentType(investment.type)) {
+      continue;
+    }
+
     const monthlyReturn = calculateMonthlyReturn(investment, state.marketSentiment, rng.next());
-    const gain = Math.round(investment.currentValue * monthlyReturn);
-    investment.currentValue = Math.max(0, investment.currentValue + gain);
+    const gain = Math.round(currentValue * monthlyReturn);
+    investment.currentValue = Math.max(0, currentValue + gain);
     totalGain += gain;
+    investmentsProcessed += 1;
 
     if (gain !== 0) {
       recordGameEvent(state, {
@@ -134,7 +160,7 @@ export function processInvestmentReturns(
     }
   }
 
-  return { totalGain, investmentsProcessed: state.company.investments.length };
+  return { totalGain, investmentsProcessed };
 }
 
 export function calculateInvestmentReturn(input: {
@@ -144,7 +170,8 @@ export function calculateInvestmentReturn(input: {
 }): number {
   const config = INVESTMENT_CONFIG;
   const baseReturn = config.baseReturnRates[input.type];
-  const sentimentAdjustment = (input.marketSentiment - 1) * config.marketSentimentWeight;
+  const marketSentiment = readMarketSentiment(input.marketSentiment);
+  const sentimentAdjustment = (marketSentiment - 1) * config.marketSentimentWeight;
   return baseReturn + sentimentAdjustment;
 }
 
@@ -175,17 +202,21 @@ function calculateMonthlyReturn(
 ): number {
   const config = INVESTMENT_CONFIG;
   const annualReturn = config.baseReturnRates[investment.type];
-  const sentimentEffect = (marketSentiment - 1) * config.marketSentimentWeight;
+  const sentimentEffect = (readMarketSentiment(marketSentiment) - 1) * config.marketSentimentWeight;
   const monthlyBase = (annualReturn + sentimentEffect) / 12;
 
   const volatility = config.volatilityByType[investment.type];
-  const noise = ((roll - 0.5) * 2 * volatility) / Math.sqrt(12);
+  const noise = ((readFinite(roll, 0.5) - 0.5) * 2 * volatility) / Math.sqrt(12);
 
   return monthlyBase + noise;
 }
 
 export function getPortfolioValue(state: GameState): number {
-  return state.company.investments.reduce((sum, inv) => sum + inv.currentValue, 0);
+  return state.company.investments.reduce(
+    (sum, inv) =>
+      sum + (isInvestmentType(inv.type) ? readNonNegativeFinite(inv.currentValue, 0) : 0),
+    0,
+  );
 }
 
 export function getPortfolioSummary(state: GameState): {
@@ -205,9 +236,14 @@ export function getPortfolioSummary(state: GameState): {
   let totalInvested = 0;
 
   for (const inv of state.company.investments) {
-    totalInvested += inv.amount;
+    if (!isInvestmentType(inv.type)) {
+      continue;
+    }
+
+    const currentValue = readNonNegativeFinite(inv.currentValue, 0);
+    totalInvested += readNonNegativeFinite(inv.amount, currentValue);
     byType[inv.type].count += 1;
-    byType[inv.type].value += inv.currentValue;
+    byType[inv.type].value += currentValue;
   }
 
   const totalValue = getPortfolioValue(state);
@@ -218,4 +254,20 @@ export function getPortfolioSummary(state: GameState): {
     totalGain: totalValue - totalInvested,
     byType,
   };
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function readNonNegativeFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function readMarketSentiment(value: number): number {
+  return readFinite(value, 1);
+}
+
+function isInvestmentType(value: unknown): value is InvestmentType {
+  return typeof value === "string" && INVESTMENT_TYPES.has(value as InvestmentType);
 }

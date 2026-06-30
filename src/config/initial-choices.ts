@@ -22,5 +22,10 @@ export const INITIAL_CHOICES: InitialChoice[] = [
 ];
 
 export function findInitialChoice(id: string): InitialChoice {
-  return INITIAL_CHOICES.find((choice) => choice.id === id) ?? INITIAL_CHOICES[0];
+  const choice = INITIAL_CHOICES.find((item) => item.id === id);
+  if (!choice) {
+    throw new Error(`Invalid initial choice: ${id}`);
+  }
+
+  return choice;
 }

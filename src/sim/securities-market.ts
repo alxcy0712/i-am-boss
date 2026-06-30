@@ -8,7 +8,22 @@ export interface SecuritiesMarketInput {
 }
 
 export function updateListedMarketValue(state: GameState, input: SecuritiesMarketInput): number {
+  if (!state.company.isPublic) {
+    return Number.isFinite(state.company.valuation) ? state.company.valuation : 0;
+  }
+
   const currentValue = state.company.listedMarketValue ?? state.company.valuation;
+  if (
+    !Number.isFinite(currentValue) ||
+    !Number.isFinite(state.marketSentiment) ||
+    !Number.isFinite(state.company.reputation) ||
+    !Number.isFinite(state.company.governanceMetrics?.overallScore ?? 0)
+  ) {
+    const fallbackValue = Number.isFinite(currentValue) ? currentValue : 0;
+    state.company.listedMarketValue = fallbackValue;
+    return fallbackValue;
+  }
+
   const sentimentMove =
     (state.marketSentiment - 1) * PROBABILITY_CONFIG.securitiesMarket.sentimentWeight;
   const reputationMove =

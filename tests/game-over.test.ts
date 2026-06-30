@@ -31,4 +31,13 @@ describe("checkGameOver", () => {
       reason: "death",
     });
   });
+
+  it("does not end the game for unknown non-finite status values", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.cash = Number.NaN;
+    state.founder.health = Number.NaN;
+    state.founder.age = Number.NaN;
+
+    expect(checkGameOver(state)).toEqual({ isGameOver: false });
+  });
 });

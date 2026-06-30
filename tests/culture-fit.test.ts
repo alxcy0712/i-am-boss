@@ -59,6 +59,20 @@ describe("culture fit", () => {
     expect(calculateCultureFit({ culture: "wolf", personality: 15 })).toBeCloseTo(0.65, 5);
   });
 
+  it("returns zero fit for invalid culture values", () => {
+    const fit = calculateCultureFit({ culture: "invalid" as never, personality: 5 });
+
+    expect(fit).toBe(0);
+  });
+
+  it("keeps culture fit finite for non-finite personality values", () => {
+    const fit = calculateCultureFit({ culture: "wolf", personality: Number.NaN });
+
+    expect(Number.isFinite(fit)).toBe(true);
+    expect(fit).toBeGreaterThanOrEqual(0);
+    expect(fit).toBeLessThanOrEqual(1);
+  });
+
   it("raises hiring acceptance when personality fits the company culture", () => {
     const wolfResult = negotiateHiring({
       seed: 7,

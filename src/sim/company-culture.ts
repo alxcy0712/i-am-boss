@@ -7,7 +7,13 @@ export interface ChangeCompanyCultureInput {
   culture: CompanyCulture;
 }
 
+const COMPANY_CULTURES = new Set<CompanyCulture>(["adaptive", "wolf", "striver", "laissez-faire"]);
+
 export function changeCompanyCulture(state: GameState, input: ChangeCompanyCultureInput): void {
+  if (!COMPANY_CULTURES.has(input.culture)) {
+    return;
+  }
+
   const config = PROBABILITY_CONFIG.companyCulture;
 
   state.company.culture = input.culture;

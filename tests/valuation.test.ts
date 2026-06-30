@@ -72,4 +72,35 @@ describe("calculateCompanyValuation", () => {
 
     expect(withDefault.value).toBe(withExplicit.value);
   });
+
+  it("returns zero for non-finite private valuation inputs", () => {
+    const valuation = calculateCompanyValuation({
+      isPublic: false,
+      annualRevenue: Number.NaN,
+      profitMargin: 0.2,
+      reputation: 6,
+      marketSentiment: 1,
+    });
+
+    expect(valuation).toEqual({
+      kind: "private_estimate",
+      value: 0,
+    });
+  });
+
+  it("returns zero for non-finite listed market value", () => {
+    const valuation = calculateCompanyValuation({
+      isPublic: true,
+      annualRevenue: 100,
+      profitMargin: 0.2,
+      reputation: 6,
+      marketSentiment: 1,
+      listedMarketValue: Number.NaN,
+    });
+
+    expect(valuation).toEqual({
+      kind: "listed_market",
+      value: 0,
+    });
+  });
 });

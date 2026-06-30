@@ -31,8 +31,18 @@ function interpolatePersonality(
 
 export function calculateCultureFit(input: CultureFitInput): number {
   const { personalityReferencePoints, compatibilityByCulture } = PROBABILITY_CONFIG.cultureFit;
+  if (!isCompanyCulture(input.culture)) {
+    return 0;
+  }
+
   const cultureValues = compatibilityByCulture[input.culture];
   return interpolatePersonality(input.personality, personalityReferencePoints, cultureValues);
+}
+
+export function isCompanyCulture(value: CompanyCulture | undefined): value is CompanyCulture {
+  return (
+    value === "adaptive" || value === "wolf" || value === "striver" || value === "laissez-faire"
+  );
 }
 
 export function resolvePersonalityLabel(personality: number): string {

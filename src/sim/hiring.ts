@@ -1,4 +1,4 @@
-import { calculateCultureFit } from "./culture-fit";
+import { calculateCultureFit, isCompanyCulture } from "./culture-fit";
 import type {
   CandidateBackground,
   CompanyCulture,
@@ -38,11 +38,26 @@ export interface HiringInput {
 export interface HiringResult {
   accepted: boolean;
   acceptanceProbability: number;
-  reason?: "salary_below_minimum" | "probability_failed";
+  reason?: "invalid_offer" | "salary_below_minimum" | "probability_failed";
 }
 
 export function negotiateHiring(input: HiringInput): HiringResult {
-  if (input.offer.salary < input.candidate.minimumSalary) {
+  if (
+    !Number.isFinite(input.offer.salary) ||
+    !Number.isFinite(input.offer.equityPercent) ||
+    input.offer.equityPercent < 0 ||
+    input.offer.equityPercent > 1
+  ) {
+    return {
+      accepted: false,
+      acceptanceProbability: 0,
+      reason: "invalid_offer",
+    };
+  }
+
+  const minimumSalary = readPositiveFinite(input.candidate.minimumSalary, 0);
+
+  if (input.offer.salary < minimumSalary) {
     return {
       accepted: false,
       acceptanceProbability: 0,
@@ -50,14 +65,18 @@ export function negotiateHiring(input: HiringInput): HiringResult {
     };
   }
 
-  const salaryFit = clamp(input.offer.salary / input.candidate.targetSalary, 0, 1);
-  const reputationFit = clamp(input.companyReputation / 10, 0, 1);
+  const targetSalary = readPositiveFinite(input.candidate.targetSalary, Infinity);
+  const companyReputation = readFinite(input.companyReputation, 0);
+  const communication = readFinite(input.candidate.communication, 0);
+  const personality = readFinite(input.candidate.personality, 5);
+  const salaryFit = clamp(input.offer.salary / targetSalary, 0, 1);
+  const reputationFit = clamp(companyReputation / 10, 0, 1);
   const equityFit = clamp(input.offer.equityPercent / 1, 0, 1);
-  const communicationFit = clamp(input.candidate.communication / 10, 0, 1);
-  const cultureFit = input.companyCulture
+  const communicationFit = clamp(communication / 10, 0, 1);
+  const cultureFit = isCompanyCulture(input.companyCulture)
     ? calculateCultureFit({
         culture: input.companyCulture,
-        personality: input.candidate.personality,
+        personality,
       })
     : 0;
   const acceptanceProbability = clamp(
@@ -78,4 +97,12 @@ export function negotiateHiring(input: HiringInput): HiringResult {
     acceptanceProbability,
     reason: accepted ? undefined : "probability_failed",
   };
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function readPositiveFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }

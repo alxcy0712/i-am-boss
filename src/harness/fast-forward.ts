@@ -15,13 +15,16 @@ export interface FastForwardResult {
 export function runFastForward(input: FastForwardInput): FastForwardResult {
   const startedAt = performance.now();
   const summary = runHarness(input);
-  const maxEventLogEntries = input.maxEventLogEntries ?? summary.eventLog.length;
+  const maxEventLogEntries = normalizeEventLogCap(
+    input.maxEventLogEntries,
+    summary.eventLog.length,
+  );
   const eventLogTruncated = summary.eventLog.length > maxEventLogEntries;
   const cappedEventLog = eventLogTruncated
-    ? summary.eventLog.slice(-maxEventLogEntries)
+    ? sliceLast(summary.eventLog, maxEventLogEntries)
     : summary.eventLog;
   const cappedEvents = eventLogTruncated
-    ? summary.events.slice(-maxEventLogEntries)
+    ? sliceLast(summary.events, maxEventLogEntries)
     : summary.events;
 
   return {
@@ -33,4 +36,18 @@ export function runFastForward(input: FastForwardInput): FastForwardResult {
     elapsedMs: performance.now() - startedAt,
     eventLogTruncated,
   };
+}
+
+function normalizeEventLogCap(value: number | undefined, fallback: number): number {
+  if (value === undefined) {
+    return fallback;
+  }
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return Math.floor(value);
+}
+
+function sliceLast<T>(items: T[], count: number): T[] {
+  return count === 0 ? [] : items.slice(-count);
 }

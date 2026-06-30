@@ -114,11 +114,169 @@ describe("addToLeaderboard", () => {
     });
     expect(entry.gameOverReason).toBe("unknown");
   });
+
+  it("normalizes invalid game over reasons before saving", () => {
+    const blankReason = addToLeaderboard({
+      daysPlayed: 5,
+      companyValuation: 100,
+      playerWealth: 50,
+      gameOverReason: "",
+    });
+    const objectReason = addToLeaderboard({
+      daysPlayed: 5,
+      companyValuation: 100,
+      playerWealth: 50,
+      gameOverReason: { bad: true } as never,
+    });
+
+    expect(blankReason.gameOverReason).toBe("unknown");
+    expect(objectReason.gameOverReason).toBe("unknown");
+  });
+
+  it("normalizes non-finite score inputs before saving", () => {
+    const entry = addToLeaderboard({
+      daysPlayed: Number.NaN,
+      companyValuation: Infinity,
+      playerWealth: Number.NaN,
+      gameOverReason: "bankruptcy",
+    });
+
+    expect(entry).toMatchObject({
+      score: 0,
+      daysPlayed: 0,
+      companyValuation: 0,
+      playerWealth: 0,
+      gameOverReason: "bankruptcy",
+    });
+    expect(getLeaderboard()).toHaveLength(1);
+    expect(getLeaderboard()[0]).toMatchObject({
+      score: 0,
+      daysPlayed: 0,
+      companyValuation: 0,
+      playerWealth: 0,
+    });
+  });
+
+  it("normalizes negative score inputs before saving", () => {
+    const entry = addToLeaderboard({
+      daysPlayed: -10,
+      companyValuation: -1000,
+      playerWealth: -500,
+      gameOverReason: "bankruptcy",
+    });
+
+    expect(entry).toMatchObject({
+      score: 0,
+      daysPlayed: 0,
+      companyValuation: 0,
+      playerWealth: 0,
+    });
+  });
 });
 
 describe("getLeaderboard", () => {
   it("returns empty array when no entries exist", () => {
     expect(getLeaderboard()).toEqual([]);
+  });
+
+  it("treats corrupt persisted data as empty", () => {
+    mockStorage.setItem("i-am-boss-leaderboard", "{}");
+
+    expect(getLeaderboard()).toEqual([]);
+
+    mockStorage.setItem(
+      "i-am-boss-leaderboard",
+      JSON.stringify([{ score: 100, daysPlayed: 10, companyValuation: "oops" }]),
+    );
+
+    expect(getLeaderboard()).toEqual([]);
+  });
+
+  it("restores valid persisted entries when another entry is corrupt", () => {
+    mockStorage.setItem(
+      "i-am-boss-leaderboard",
+      JSON.stringify([
+        {
+          id: "valid-entry",
+          score: 200,
+          daysPlayed: 20,
+          companyValuation: 1000,
+          playerWealth: 500,
+          gameOverReason: "bankruptcy",
+          date: "2026-01-01T00:00:00.000Z",
+          rank: 0,
+        },
+        {
+          id: "bad-entry",
+          score: 100,
+          daysPlayed: 10,
+          companyValuation: "oops",
+        },
+      ]),
+    );
+
+    const entries = getLeaderboard();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: "valid-entry",
+      score: 200,
+      rank: 1,
+    });
+  });
+
+  it("filters persisted entries with negative numeric fields", () => {
+    mockStorage.setItem(
+      "i-am-boss-leaderboard",
+      JSON.stringify([
+        {
+          id: "valid-entry",
+          score: 200,
+          daysPlayed: 20,
+          companyValuation: 1000,
+          playerWealth: 500,
+        },
+        {
+          id: "negative-entry",
+          score: -1,
+          daysPlayed: -20,
+          companyValuation: -1000,
+          playerWealth: -500,
+        },
+      ]),
+    );
+
+    const entries = getLeaderboard();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].id).toBe("valid-entry");
+  });
+
+  it("filters persisted entries with non-number optional numeric fields", () => {
+    mockStorage.setItem(
+      "i-am-boss-leaderboard",
+      JSON.stringify([
+        {
+          id: "valid-entry",
+          score: 200,
+          daysPlayed: 20,
+          companyValuation: 1000,
+          playerWealth: 500,
+        },
+        {
+          id: "coerced-entry",
+          score: 100,
+          daysPlayed: 10,
+          companyValuation: true,
+          playerWealth: "",
+        },
+      ]),
+    );
+
+    const entries = getLeaderboard();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].id).toBe("valid-entry");
   });
 
   it("returns entries sorted by score descending", () => {
@@ -145,6 +303,20 @@ describe("getLeaderboard", () => {
     expect(getLeaderboard(5)).toHaveLength(5);
     expect(getLeaderboard(10)).toHaveLength(10);
     expect(getLeaderboard()).toHaveLength(15);
+  });
+
+  it("normalizes invalid limit parameters", () => {
+    for (let i = 0; i < 3; i++) {
+      addToLeaderboard({
+        daysPlayed: i + 1,
+        companyValuation: (i + 1) * 1000,
+        playerWealth: 0,
+      });
+    }
+
+    expect(getLeaderboard(-1)).toHaveLength(0);
+    expect(getLeaderboard(Number.NaN)).toHaveLength(0);
+    expect(getLeaderboard(1.8)).toHaveLength(1);
   });
 
   it("assigns correct sequential ranks", () => {
@@ -248,6 +420,48 @@ describe("importLeaderboard", () => {
     expect(() => importLeaderboard(JSON.stringify([{ foo: "bar" }]))).toThrow(
       "Invalid leaderboard entry: missing required numeric fields",
     );
+  });
+
+  it("throws on null entries", () => {
+    expect(() => importLeaderboard("[null]")).toThrow(
+      "Invalid leaderboard entry: expected an object",
+    );
+  });
+
+  it("throws on required numeric fields that are not finite", () => {
+    expect(() => importLeaderboard('[{"score":1e999,"daysPlayed":10}]')).toThrow(
+      "Invalid leaderboard entry: invalid numeric field: score",
+    );
+  });
+
+  it("throws on optional numeric fields that cannot be parsed", () => {
+    expect(() =>
+      importLeaderboard(
+        JSON.stringify([
+          {
+            score: 100,
+            daysPlayed: 10,
+            companyValuation: "oops",
+            playerWealth: 50,
+          },
+        ]),
+      ),
+    ).toThrow("Invalid leaderboard entry: invalid numeric field: companyValuation");
+  });
+
+  it("throws on optional numeric fields that are coercible non-numbers", () => {
+    expect(() =>
+      importLeaderboard(
+        JSON.stringify([
+          {
+            score: 100,
+            daysPlayed: 10,
+            companyValuation: true,
+            playerWealth: "",
+          },
+        ]),
+      ),
+    ).toThrow("Invalid leaderboard entry: invalid numeric field: companyValuation");
   });
 
   it("fills in defaults for optional fields", () => {

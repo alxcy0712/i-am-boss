@@ -31,6 +31,18 @@ describe("calculateResourceCapacity", () => {
     const highCash = calculateResourceCapacity({ headcount: 5, cash: 500_000, reputation: 2 });
     expect(highRep).toBeGreaterThan(highCash);
   });
+
+  it("returns finite capacity for non-finite inputs", () => {
+    const capacity = calculateResourceCapacity({
+      headcount: Number.NaN,
+      cash: Infinity,
+      reputation: Number.NaN,
+    });
+
+    expect(Number.isFinite(capacity)).toBe(true);
+    expect(capacity).toBeGreaterThanOrEqual(0);
+    expect(capacity).toBeLessThanOrEqual(10);
+  });
 });
 
 describe("updateResources", () => {
@@ -81,6 +93,16 @@ describe("updateResources", () => {
     updateResources(state);
     expect(state.company.resources).toBeLessThanOrEqual(10);
   });
+
+  it("keeps resources and operational capability finite when state inputs are non-finite", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.cash = Number.NaN;
+
+    updateResources(state);
+
+    expect(Number.isFinite(state.company.resources)).toBe(true);
+    expect(Number.isFinite(state.company.operationalCapability)).toBe(true);
+  });
 });
 
 describe("calculateOperationalEfficiency", () => {
@@ -130,6 +152,18 @@ describe("calculateOperationalEfficiency", () => {
     });
     expect(adaptive).toBeGreaterThan(laissezFaire);
   });
+
+  it("returns finite efficiency for non-finite inputs", () => {
+    const efficiency = calculateOperationalEfficiency({
+      resources: Number.NaN,
+      headcount: Infinity,
+      culture: undefined as never,
+    });
+
+    expect(Number.isFinite(efficiency)).toBe(true);
+    expect(efficiency).toBeGreaterThanOrEqual(0.5);
+    expect(efficiency).toBeLessThanOrEqual(1.5);
+  });
 });
 
 describe("applyResourceCost", () => {
@@ -151,6 +185,16 @@ describe("applyResourceCost", () => {
 
     expect(result).toBe(false);
     expect(state.company.resources).toBe(2);
+  });
+
+  it("rejects non-finite resource costs without changing resources", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.resources = 5;
+
+    const result = applyResourceCost(state, Number.NaN);
+
+    expect(result).toBe(false);
+    expect(state.company.resources).toBe(5);
   });
 
   it("clamps resources to 0 after deduction", () => {

@@ -8,6 +8,15 @@ describe("getKondratievPhase", () => {
     expect(getKondratievPhase(365 * 30).name).toBe("recession");
     expect(getKondratievPhase(365 * 45).name).toBe("depression");
   });
+
+  it("wraps negative days into the same deterministic cycle", () => {
+    expect(getKondratievPhase(-1).name).toBe("depression");
+  });
+
+  it("uses recovery for non-finite days", () => {
+    expect(getKondratievPhase(Number.NaN).name).toBe("recovery");
+    expect(getKondratievPhase(Infinity).name).toBe("recovery");
+  });
 });
 
 describe("applyMacroCycle", () => {

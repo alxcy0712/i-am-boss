@@ -27,16 +27,64 @@ const EMPTY_SEVERITY_COUNTS: GameEventSeverityCounts = {
 };
 
 export function recordGameEvent(state: GameState, payload: GameEventPayload): GameEvent {
+  if (hasNonFiniteNumber(payload) || hasBlankString(payload)) {
+    throw new Error(`Invalid game event payload: ${String(payload.type)}`);
+  }
+
+  const category = getGameEventCategory(payload);
+  const severity = getGameEventSeverity(payload);
+  let formatted: string;
+
+  try {
+    formatted = formatGameEvent(payload);
+  } catch {
+    throw new Error(`Invalid game event payload: ${String(payload.type)}`);
+  }
+
+  if (
+    !(category in EMPTY_CATEGORY_COUNTS) ||
+    !(severity in EMPTY_SEVERITY_COUNTS) ||
+    typeof formatted !== "string"
+  ) {
+    throw new Error(`Invalid game event payload: ${String(payload.type)}`);
+  }
+
   const event = {
     ...payload,
     day: state.day,
-    category: getGameEventCategory(payload),
-    severity: getGameEventSeverity(payload),
+    category,
+    severity,
   } as GameEvent;
 
   state.events.push(event);
-  state.eventLog.push(formatGameEvent(event));
+  state.eventLog.push(formatted);
   return event;
+}
+
+function hasNonFiniteNumber(value: unknown): boolean {
+  if (typeof value === "number") {
+    return !Number.isFinite(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some(hasNonFiniteNumber);
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).some(hasNonFiniteNumber);
+  }
+  return false;
+}
+
+function hasBlankString(value: unknown): boolean {
+  if (typeof value === "string") {
+    return value.trim().length === 0;
+  }
+  if (Array.isArray(value)) {
+    return value.some(hasBlankString);
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).some(hasBlankString);
+  }
+  return false;
 }
 
 export function createGameEventSummary(events: GameEvent[]): GameEventSummary {
@@ -44,8 +92,12 @@ export function createGameEventSummary(events: GameEvent[]): GameEventSummary {
   const bySeverity = { ...EMPTY_SEVERITY_COUNTS };
 
   for (const event of events) {
-    byCategory[event.category] += 1;
-    bySeverity[event.severity] += 1;
+    if (event.category in byCategory) {
+      byCategory[event.category] += 1;
+    }
+    if (event.severity in bySeverity) {
+      bySeverity[event.severity] += 1;
+    }
   }
 
   return {

@@ -1,4 +1,9 @@
-import { runHarness, runHarnessTimeline, summarizeGameState } from "../src/harness/sim-harness";
+import {
+  advanceGameState,
+  runHarness,
+  runHarnessTimeline,
+  summarizeGameState,
+} from "../src/harness/sim-harness";
 import { calculateFinalScore } from "../src/sim/scoring";
 import { hireEmployee } from "../src/sim/employee-lifecycle";
 import { purchaseInsurance } from "../src/sim/insurance";
@@ -7,6 +12,23 @@ import { calculateResignationRisk } from "../src/sim/resignation";
 import { createInitialGameState } from "../src/sim/state";
 
 describe("runHarness", () => {
+  it("rejects unknown initial choices", () => {
+    expect(() => createInitialGameState({ seed: 1, initialChoiceId: "unknown-founder" })).toThrow(
+      "Invalid initial choice: unknown-founder",
+    );
+    expect(() => runHarness({ seed: 1, days: 30, initialChoiceId: "unknown-founder" })).toThrow(
+      "Invalid initial choice: unknown-founder",
+    );
+    expect(() =>
+      runHarnessTimeline({
+        seed: 1,
+        days: 30,
+        initialChoiceId: "unknown-founder",
+        checkpointIntervalDays: 10,
+      }),
+    ).toThrow("Invalid initial choice: unknown-founder");
+  });
+
   it("returns deterministic summaries for the same seed and day count", () => {
     const first = runHarness({ seed: 42, days: 365, initialChoiceId: "technical-founder" });
     const second = runHarness({ seed: 42, days: 365, initialChoiceId: "technical-founder" });
@@ -154,6 +176,27 @@ describe("runHarness", () => {
     expect(timeline.checkpoints[0].cash).toBeGreaterThanOrEqual(0);
     expect(timeline.checkpoints[0].companyValuation).toBeGreaterThan(0);
     expect(timeline.checkpoints[0].score).toBeGreaterThan(0);
+  });
+
+  it("rejects invalid timeline checkpoint intervals", () => {
+    for (const checkpointIntervalDays of [0, -1, 1.5, Number.NaN, Infinity]) {
+      expect(() =>
+        runHarnessTimeline({
+          seed: 7,
+          days: 200,
+          initialChoiceId: "technical-founder",
+          checkpointIntervalDays,
+        }),
+      ).toThrow("Invalid checkpoint interval: expected a positive integer day count");
+      expect(() =>
+        advanceGameState(createInitialGameState({ seed: 7 }), {
+          seed: 7,
+          days: 200,
+          checkpointIntervalDays,
+          recordCheckpoint: () => {},
+        }),
+      ).toThrow("Invalid checkpoint interval: expected a positive integer day count");
+    }
   });
 
   it("includes AI hiring stats when aiHiringEnabled is true", () => {

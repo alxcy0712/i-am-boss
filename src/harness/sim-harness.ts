@@ -199,6 +199,16 @@ export function advanceGameState(
   state: GameState,
   input: AdvanceGameStateInput,
 ): AdvanceGameStateResult {
+  if (!Number.isInteger(input.days) || input.days <= 0) {
+    throw new Error("Invalid advance days: expected a positive integer day count");
+  }
+  if (
+    input.checkpointIntervalDays !== undefined &&
+    (!Number.isInteger(input.checkpointIntervalDays) || input.checkpointIntervalDays <= 0)
+  ) {
+    throw new Error("Invalid checkpoint interval: expected a positive integer day count");
+  }
+
   const rng = createSeededRng(input.seed + state.day);
   let gameOverReason: GameOverReason | undefined;
 
@@ -389,11 +399,12 @@ export function summarizeGameState(
   gameOverReason?: GameOverReason,
   aiHiringEnabled?: boolean,
 ): HarnessSummary {
-  const companyValuation = state.company.valuation;
-  const playerWealth = state.founder.wealth;
+  const daysPlayed = readNonNegativeFinite(state.day, 0);
+  const companyValuation = readNonNegativeFinite(state.company.valuation, 0);
+  const playerWealth = readNonNegativeFinite(state.founder.wealth, 0);
   const staffRoleCounts = createStaffRoleCounts(state);
   const totalMonthlyPayroll = state.company.employees.reduce(
-    (total, employee) => total + employee.salary,
+    (total, employee) => total + readNonNegativeFinite(employee.salary, 0),
     0,
   );
   const averageEmployeeSalary =
@@ -407,70 +418,83 @@ export function summarizeGameState(
   const activeInsurancePolicies = state.company.insurancePolicies.filter((p) => p.active).length;
   const totalMonthlyInsurancePremiums = state.company.insurancePolicies
     .filter((p) => p.active)
-    .reduce((sum, p) => sum + p.premium, 0);
+    .reduce((sum, p) => sum + readNonNegativeFinite(p.premium, 0), 0);
 
   const investmentCount = state.company.investments.length;
-  const portfolioValue = getPortfolioValue(state);
-  const totalInvested = state.company.investments.reduce((sum, inv) => sum + inv.amount, 0);
+  const portfolioValue = readNonNegativeFinite(getPortfolioValue(state), 0);
+  const totalInvested = state.company.investments.reduce(
+    (sum, inv) => sum + readNonNegativeFinite(inv.amount, 0),
+    0,
+  );
   const investmentGain = portfolioValue - totalInvested;
 
   return {
-    daysPlayed: state.day,
+    daysPlayed,
     companyValuation,
     valuationKind: state.company.isPublic ? "listed_market" : "private_estimate",
     isPublic: state.company.isPublic,
-    listedMarketValue: state.company.listedMarketValue,
+    listedMarketValue:
+      state.company.listedMarketValue === undefined
+        ? undefined
+        : readNonNegativeFinite(state.company.listedMarketValue, 0),
     playerWealth,
     score: calculateFinalScore({
-      daysPlayed: state.day,
+      daysPlayed,
       companyValuation,
       playerWealth,
     }),
-    cash: state.company.cash,
-    headcount: state.company.headcount,
-    debt: state.company.debt,
+    cash: readFinite(state.company.cash, 0),
+    headcount: readNonNegativeFinite(state.company.headcount, 0),
+    debt: readNonNegativeFinite(state.company.debt, 0),
     employeeCount: state.company.employees.length,
     staffRoleCounts,
     totalMonthlyPayroll,
     averageEmployeeSalary,
-    employees: state.company.employees.map((employee) => ({
-      id: employee.id,
-      role: employee.role,
-      salary: employee.salary,
-      targetSalary: employee.targetSalary,
-      personality: employee.personality,
-      monthsTenure: employee.monthsTenure,
-      managementLevel: employee.managementLevel,
-      resignationRisk: calculateResignationRisk({
-        salary: employee.salary,
-        targetSalary: employee.targetSalary,
-        stressTolerance: employee.stressTolerance,
-        culturePressure: state.company.culturePressure,
-        morale: state.company.morale,
-        culture: state.company.culture,
-        personality: employee.personality,
-      }),
-      abilities: {
-        technical: employee.technical,
-        experience: employee.experience,
-        stressTolerance: employee.stressTolerance,
-        communication: employee.communication,
-        eq: employee.eq,
-        iq: employee.iq,
-      },
-    })),
-    companyReputation: state.company.reputation,
-    companyMorale: state.company.morale,
+    employees: state.company.employees.map((employee) => {
+      const salary = readNonNegativeFinite(employee.salary, 0);
+      const targetSalary = readNonNegativeFinite(employee.targetSalary, salary);
+      const stressTolerance = readFinite(employee.stressTolerance, 0);
+      const personality = readFinite(employee.personality, 0);
+
+      return {
+        id: employee.id,
+        role: employee.role,
+        salary,
+        targetSalary,
+        personality,
+        monthsTenure: readNonNegativeFinite(employee.monthsTenure, 0),
+        managementLevel: employee.managementLevel,
+        resignationRisk: calculateResignationRisk({
+          salary,
+          targetSalary,
+          stressTolerance,
+          culturePressure: readFinite(state.company.culturePressure, 0),
+          morale: readFinite(state.company.morale, 0),
+          culture: state.company.culture,
+          personality,
+        }),
+        abilities: {
+          technical: readFinite(employee.technical, 0),
+          experience: readFinite(employee.experience, 0),
+          stressTolerance,
+          communication: readFinite(employee.communication, 0),
+          eq: readFinite(employee.eq, 0),
+          iq: readFinite(employee.iq, 0),
+        },
+      };
+    }),
+    companyReputation: readFinite(state.company.reputation, 0),
+    companyMorale: readFinite(state.company.morale, 0),
     companyCulture: state.company.culture,
-    culturePressure: state.company.culturePressure,
+    culturePressure: readFinite(state.company.culturePressure, 0),
     founderAbilities: state.founder.abilities,
-    founderAge: state.founder.age,
-    founderHealth: state.founder.health,
+    founderAge: readNonNegativeFinite(state.founder.age, 0),
+    founderHealth: readFinite(state.founder.health, 0),
     cyclePhase: state.society.cyclePhase,
-    unemploymentRate: state.society.unemploymentRate,
-    legalCaseCount: state.society.legalCaseCount,
-    policySupportCount: state.society.policySupportCount,
-    specialEventCount: state.society.specialEventCount,
+    unemploymentRate: readFinite(state.society.unemploymentRate, 0),
+    legalCaseCount: readNonNegativeFinite(state.society.legalCaseCount, 0),
+    policySupportCount: readNonNegativeFinite(state.society.policySupportCount, 0),
+    specialEventCount: readNonNegativeFinite(state.society.specialEventCount, 0),
     events: state.events,
     eventSummary: createGameEventSummary(state.events),
     eventLog: state.eventLog,
@@ -484,7 +508,10 @@ export function summarizeGameState(
     portfolioValue,
     totalInvested,
     investmentGain,
-    governanceScore: state.company.governanceMetrics?.overallScore,
+    governanceScore:
+      state.company.governanceMetrics?.overallScore === undefined
+        ? undefined
+        : readFinite(state.company.governanceMetrics.overallScore, 0),
     delistingRiskLevel: state.company.isPublic ? evaluateDelistingRisk(state).riskLevel : undefined,
   };
 }
@@ -544,4 +571,12 @@ function createEmptyRoleCounts(): CompanyRoleCounts {
     }),
     {} as CompanyRoleCounts,
   );
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function readNonNegativeFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
 }

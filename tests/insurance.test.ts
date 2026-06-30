@@ -56,6 +56,17 @@ describe("purchaseInsurance", () => {
     expect(state.company.insurancePolicies).toHaveLength(1);
   });
 
+  it("rejects invalid insurance types", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const cashBefore = state.company.cash;
+
+    const result = purchaseInsurance(state, { type: "invalid" as never });
+
+    expect(result).toEqual({ purchased: false, reason: "invalid_insurance_type" });
+    expect(state.company.cash).toBe(cashBefore);
+    expect(state.company.insurancePolicies).toHaveLength(0);
+  });
+
   it("allows purchasing a different insurance type", () => {
     const state = createInitialGameState({ seed: 1 });
 
@@ -75,6 +86,23 @@ describe("purchaseInsurance", () => {
     expect(insuranceEvent).toBeDefined();
     expect(insuranceEvent!.category).toBe("finance");
     expect(insuranceEvent!.severity).toBe("positive");
+  });
+
+  it("keeps corrupted risk inputs from polluting purchased policies", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.cash = 1_000_000;
+    state.company.headcount = Infinity;
+    state.company.operationalCapability = Number.NaN;
+    state.marketSentiment = Number.NaN;
+    state.society.legalCaseCount = Infinity;
+
+    const result = purchaseInsurance(state, { type: "legal" });
+
+    expect(result.purchased).toBe(true);
+    expect(Number.isFinite(result.policy!.premium)).toBe(true);
+    expect(Number.isFinite(result.policy!.coverage)).toBe(true);
+    expect(Number.isFinite(result.policy!.deductible)).toBe(true);
+    expect(Number.isFinite(state.company.cash)).toBe(true);
   });
 
   it("comprehensive insurance costs more than single-risk policies", () => {
@@ -146,6 +174,116 @@ describe("processInsuranceClaim", () => {
     expect(result.reason).toBe("damage_below_deductible");
   });
 
+  it("rejects claim with non-finite damage amount", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const purchase = purchaseInsurance(state, { type: "market" });
+    const policy = purchase.policy!;
+    const cashBefore = state.company.cash;
+
+    const result = processInsuranceClaim(state, {
+      policyId: policy.id,
+      damageAmount: Number.NaN,
+    });
+
+    expect(result.approved).toBe(false);
+    expect(result.payout).toBe(0);
+    expect(result.reason).toBe("invalid_damage_amount");
+    expect(state.company.cash).toBe(cashBefore);
+  });
+
+  it("rejects claim with negative damage amount", () => {
+    const state = createInitialGameState({ seed: 1 });
+    const purchase = purchaseInsurance(state, { type: "market" });
+    const policy = purchase.policy!;
+    const cashBefore = state.company.cash;
+
+    const result = processInsuranceClaim(state, {
+      policyId: policy.id,
+      damageAmount: -1,
+    });
+
+    expect(result.approved).toBe(false);
+    expect(result.payout).toBe(0);
+    expect(result.reason).toBe("invalid_damage_amount");
+    expect(state.company.cash).toBe(cashBefore);
+  });
+
+  it("rejects claims for corrupted policy amounts without changing cash", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.cash = 1_000;
+    state.company.insurancePolicies.push({
+      id: "bad-policy",
+      type: "legal",
+      premium: 100,
+      coverage: Number.NaN,
+      deductible: Number.NaN,
+      active: true,
+      startDate: 0,
+    });
+
+    const result = processInsuranceClaim(state, {
+      policyId: "bad-policy",
+      damageAmount: 50_000,
+    });
+
+    expect(result.approved).toBe(false);
+    expect(result.payout).toBe(0);
+    expect(result.reason).toBe("invalid_policy");
+    expect(state.company.cash).toBe(1_000);
+  });
+
+  it("rejects claims for negative policy amounts without changing cash", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.cash = 1_000;
+    state.company.insurancePolicies.push({
+      id: "bad-policy",
+      type: "legal",
+      premium: 100,
+      coverage: 1_000,
+      deductible: -100,
+      active: true,
+      startDate: 0,
+    });
+
+    const result = processInsuranceClaim(state, {
+      policyId: "bad-policy",
+      damageAmount: 50_000,
+    });
+
+    expect(result.approved).toBe(false);
+    expect(result.payout).toBe(0);
+    expect(result.reason).toBe("invalid_policy");
+    expect(state.company.cash).toBe(1_000);
+  });
+
+  it("rejects claims for corrupted policy ids without changing cash or events", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.company.cash = 1_000;
+    state.company.insurancePolicies.push({
+      id: " ",
+      type: "legal",
+      premium: 100,
+      coverage: 10_000,
+      deductible: 100,
+      active: true,
+      startDate: 0,
+    });
+    const eventCount = state.events.length;
+    const eventLog = [...state.eventLog];
+
+    const result = processInsuranceClaim(state, {
+      policyId: " ",
+      damageAmount: 1_000,
+    });
+
+    expect(result.approved).toBe(false);
+    expect(result.payout).toBe(0);
+    expect(result.reason).toBe("invalid_policy");
+    expect(state.company.cash).toBe(1_000);
+    expect(state.events).toHaveLength(eventCount);
+    expect(state.eventLog).toEqual(eventLog);
+  });
+
   it("rejects claim for non-existent policy", () => {
     const state = createInitialGameState({ seed: 1 });
 
@@ -215,6 +353,17 @@ describe("calculateInsurancePremium", () => {
 
     expect(premium).toBeGreaterThan(0);
   });
+
+  it("returns a finite premium for corrupted size and risk inputs", () => {
+    const premium = calculateInsurancePremium({
+      type: "legal",
+      companySize: Infinity,
+      riskScore: Number.NaN,
+    });
+
+    expect(Number.isFinite(premium)).toBe(true);
+    expect(premium).toBeGreaterThan(0);
+  });
 });
 
 describe("evaluateRiskProfile", () => {
@@ -260,5 +409,19 @@ describe("evaluateRiskProfile", () => {
     expect(profile.recommendations.length).toBeGreaterThan(0);
     expect(profile.recommendations.some((r) => r.includes("legal"))).toBe(true);
     expect(profile.recommendations.some((r) => r.includes("operational"))).toBe(true);
+  });
+
+  it("returns finite risk factors for corrupted company state", () => {
+    const state = createInitialGameState({ seed: 1 });
+    state.society.legalCaseCount = Infinity;
+    state.company.operationalCapability = Number.NaN;
+    state.marketSentiment = Number.NaN;
+
+    const profile = evaluateRiskProfile(state);
+
+    expect(Number.isFinite(profile.riskScore)).toBe(true);
+    expect(Number.isFinite(profile.factors.legalRisk)).toBe(true);
+    expect(Number.isFinite(profile.factors.operationalRisk)).toBe(true);
+    expect(Number.isFinite(profile.factors.marketRisk)).toBe(true);
   });
 });

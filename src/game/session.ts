@@ -27,6 +27,29 @@ import { createGameViewModel } from "../ui/view-model";
 
 export const CANDIDATE_SKIP_LIMIT = 10;
 
+const COMPANY_CULTURES = new Set<CompanyCulture>(["adaptive", "wolf", "striver", "laissez-faire"]);
+const SESSION_ACTION_IDS = new Set<string>([
+  "advance-30-days",
+  "recruit-candidate",
+  "skip-candidate",
+  "request-bank-loan",
+  "request-policy-support",
+  "prepare-ipo",
+  "change-culture",
+  "terminate-employee",
+  "raise-employee-salary",
+  "toggle-ai-hiring",
+  "run-ai-hiring-cycle",
+  "purchase-insurance",
+  "file-insurance-claim",
+  "make-investment",
+  "sell-investment",
+  "buy-car",
+  "upgrade-car",
+  "get-married",
+  "have-child",
+]);
+
 export interface GameSession {
   seed: number;
   initialChoices: InitialChoice[];
@@ -43,10 +66,13 @@ export interface SessionAction {
   id:
     | "advance-30-days"
     | "recruit-candidate"
+    | "skip-candidate"
     | "request-bank-loan"
     | "request-policy-support"
     | "prepare-ipo"
     | "change-culture"
+    | "terminate-employee"
+    | "raise-employee-salary"
     | "toggle-ai-hiring"
     | "run-ai-hiring-cycle"
     | "purchase-insurance"
@@ -95,7 +121,7 @@ export interface RecruitmentCandidatePreview extends Candidate {
 
 export function createGameSession(input: { seed: number }): GameSession {
   return {
-    seed: input.seed,
+    seed: readPositiveInteger(input.seed, 1),
     initialChoices: INITIAL_CHOICES,
     candidateCursor: 0,
     candidateSkipCount: 0,
@@ -103,6 +129,10 @@ export function createGameSession(input: { seed: number }): GameSession {
 }
 
 export function selectInitialChoice(session: GameSession, choiceId: string): GameSession {
+  if (session.selectedInitialChoiceId) {
+    throw new Error(`Initial choice already selected: ${session.selectedInitialChoiceId}`);
+  }
+
   const state = createInitialGameState({
     seed: session.seed,
     initialChoiceId: choiceId,
@@ -147,11 +177,18 @@ export function createSessionViewModel(session: GameSession): GameViewModel {
   return createGameViewModel(session.summary);
 }
 
+export function hasRecruitmentCandidate(session: GameSession): boolean {
+  return (session.candidateSkipCount ?? 0) <= CANDIDATE_SKIP_LIMIT;
+}
+
 export function getSessionActions(session: GameSession): SessionAction[] {
-  const enabled = Boolean(session.selectedInitialChoiceId && session.state);
+  const enabled = Boolean(
+    session.selectedInitialChoiceId && session.state && !session.gameOverReason,
+  );
+  const recruitmentEnabled = enabled && hasRecruitmentCandidate(session);
   return [
     { id: "advance-30-days", label: "Advance 30 Days", enabled },
-    { id: "recruit-candidate", label: "Recruit Candidate", enabled },
+    { id: "recruit-candidate", label: "Recruit Candidate", enabled: recruitmentEnabled },
     { id: "request-bank-loan", label: "Request Bank Loan", enabled },
     { id: "request-policy-support", label: "Request Policy Support", enabled },
     { id: "prepare-ipo", label: "Prepare IPO", enabled },
@@ -201,6 +238,20 @@ export function performSessionAction(
   session: GameSession,
   action: SessionActionRequest,
 ): SessionActionResult {
+  if (!SESSION_ACTION_IDS.has(action.id)) {
+    return {
+      session,
+      message: "Invalid action",
+    };
+  }
+
+  if (session.gameOverReason) {
+    return {
+      session,
+      message: `Game over: ${session.gameOverReason}`,
+    };
+  }
+
   if (action.id === "advance-30-days") {
     return {
       session: advanceSession(session, 30),
@@ -237,6 +288,14 @@ export function performSessionAction(
   }
 
   if (action.id === "change-culture") {
+    if (!COMPANY_CULTURES.has(action.culture)) {
+      return actionResult(session, state, "Invalid culture");
+    }
+
+    if (state.company.culture === action.culture) {
+      return actionResult(session, state, "Culture unchanged");
+    }
+
     changeCompanyCulture(state, { culture: action.culture });
     return actionResult(session, state, `Culture changed: ${action.culture}`);
   }
@@ -254,6 +313,10 @@ export function performSessionAction(
   }
 
   if (action.id === "raise-employee-salary") {
+    if (action.salary !== undefined && !Number.isFinite(action.salary)) {
+      return actionResult(session, state, "Invalid salary");
+    }
+
     const result = raiseEmployeeSalary(state, {
       employeeId: action.employeeId,
       salary: action.salary,
@@ -278,6 +341,10 @@ export function performSessionAction(
   }
 
   if (action.id === "run-ai-hiring-cycle") {
+    if (!session.aiHiringEnabled) {
+      return actionResult(session, state, "AI hiring disabled");
+    }
+
     const result = runAIHiringCycle(state, { seed: session.seed + state.day });
     return actionResult(
       session,
@@ -398,7 +465,14 @@ export function performSessionAction(
     );
   }
 
-  return recruitCandidate(session, state, action);
+  if (action.id === "recruit-candidate") {
+    return recruitCandidate(session, state, action);
+  }
+
+  return {
+    session,
+    message: "Invalid action",
+  };
 }
 
 export function previewRecruitmentCandidate(session: GameSession): RecruitmentCandidatePreview {
@@ -410,6 +484,10 @@ function recruitCandidate(
   state: GameState,
   action: Extract<SessionActionRequest, { id: "recruit-candidate" }>,
 ): SessionActionResult {
+  if (!hasRecruitmentCandidate(session)) {
+    return actionResult(session, state, "No candidates remaining");
+  }
+
   const preview = previewRecruitmentCandidateForState(session, state);
   const offer = {
     salary: action.salary ?? Math.round(preview.targetSalary * 0.96),
@@ -429,15 +507,27 @@ function recruitCandidate(
       salary: offer.salary,
       equityPercent: offer.equityPercent,
     });
+    const candidateSkipCount =
+      (session.candidateSkipCount ?? 0) >= CANDIDATE_SKIP_LIMIT
+        ? CANDIDATE_SKIP_LIMIT + 1
+        : session.candidateSkipCount;
     return actionResult(
-      { ...session, candidateCursor: (session.candidateCursor ?? 0) + 1 },
+      {
+        ...session,
+        candidateCursor: (session.candidateCursor ?? 0) + 1,
+        candidateSkipCount,
+      },
       state,
       `Hired ${preview.role} for ¥${offer.salary.toLocaleString("en-US")}`,
     );
   }
 
   const reason =
-    negotiation.reason === "salary_below_minimum" ? "salary below minimum" : "candidate declined";
+    negotiation.reason === "salary_below_minimum"
+      ? "salary below minimum"
+      : negotiation.reason === "invalid_offer"
+        ? "invalid offer"
+        : "candidate declined";
   recordGameEvent(state, {
     type: "hiring_failed",
     role: preview.role,
@@ -498,4 +588,8 @@ function cloneSessionState(session: GameSession): GameState {
   }
 
   return structuredClone(session.state);
+}
+
+function readPositiveInteger(value: number, fallback: number): number {
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
