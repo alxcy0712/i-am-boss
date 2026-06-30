@@ -177,13 +177,18 @@ export function createSessionViewModel(session: GameSession): GameViewModel {
   return createGameViewModel(session.summary);
 }
 
+export function hasRecruitmentCandidate(session: GameSession): boolean {
+  return (session.candidateSkipCount ?? 0) <= CANDIDATE_SKIP_LIMIT;
+}
+
 export function getSessionActions(session: GameSession): SessionAction[] {
   const enabled = Boolean(
     session.selectedInitialChoiceId && session.state && !session.gameOverReason,
   );
+  const recruitmentEnabled = enabled && hasRecruitmentCandidate(session);
   return [
     { id: "advance-30-days", label: "Advance 30 Days", enabled },
-    { id: "recruit-candidate", label: "Recruit Candidate", enabled },
+    { id: "recruit-candidate", label: "Recruit Candidate", enabled: recruitmentEnabled },
     { id: "request-bank-loan", label: "Request Bank Loan", enabled },
     { id: "request-policy-support", label: "Request Policy Support", enabled },
     { id: "prepare-ipo", label: "Prepare IPO", enabled },
@@ -479,6 +484,10 @@ function recruitCandidate(
   state: GameState,
   action: Extract<SessionActionRequest, { id: "recruit-candidate" }>,
 ): SessionActionResult {
+  if (!hasRecruitmentCandidate(session)) {
+    return actionResult(session, state, "No candidates remaining");
+  }
+
   const preview = previewRecruitmentCandidateForState(session, state);
   const offer = {
     salary: action.salary ?? Math.round(preview.targetSalary * 0.96),
@@ -498,8 +507,16 @@ function recruitCandidate(
       salary: offer.salary,
       equityPercent: offer.equityPercent,
     });
+    const candidateSkipCount =
+      (session.candidateSkipCount ?? 0) >= CANDIDATE_SKIP_LIMIT
+        ? CANDIDATE_SKIP_LIMIT + 1
+        : session.candidateSkipCount;
     return actionResult(
-      { ...session, candidateCursor: (session.candidateCursor ?? 0) + 1 },
+      {
+        ...session,
+        candidateCursor: (session.candidateCursor ?? 0) + 1,
+        candidateSkipCount,
+      },
       state,
       `Hired ${preview.role} for ¥${offer.salary.toLocaleString("en-US")}`,
     );

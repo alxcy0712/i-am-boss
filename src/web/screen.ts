@@ -2,6 +2,7 @@ import {
   CANDIDATE_SKIP_LIMIT,
   createSessionViewModel,
   getSessionActions,
+  hasRecruitmentCandidate,
   previewRecruitmentCandidate,
   type GameSession,
   type RecruitmentCandidatePreview,
@@ -173,6 +174,7 @@ export interface WebRecruitmentCustomOffer {
   minimumSalary: number;
   equityPercent: number;
   actionId: "recruit-candidate";
+  enabled: boolean;
 }
 
 export interface WebRecruitmentOffer {
@@ -475,7 +477,7 @@ export function createWebScreenModel(
         ...zone,
         label: translateMapZoneLabel(zone.id, zone.label, language),
       })) ?? [],
-    mapTiles: viewModel ? createMapTiles(viewModel, language) : [],
+    mapTiles: viewModel ? createMapTiles(viewModel, session, language) : [],
     founder: viewModel ? createFounderPanel(viewModel, language, copy) : undefined,
     staff: viewModel ? createStaffPanel(viewModel, language, copy) : undefined,
     culture: viewModel ? createCulturePanel(viewModel, language, copy) : undefined,
@@ -750,7 +752,11 @@ function formatAbilityBonus(
     .join(", ");
 }
 
-function createMapTiles(viewModel: GameViewModel, language: WebLanguage): WebMapTile[] {
+function createMapTiles(
+  viewModel: GameViewModel,
+  session: GameSession,
+  language: WebLanguage,
+): WebMapTile[] {
   return [
     ...INFRASTRUCTURE_TILES,
     ...viewModel.mapLocations.map((zone) => {
@@ -763,7 +769,7 @@ function createMapTiles(viewModel: GameViewModel, language: WebLanguage): WebMap
         id: `district-${zone.id}`,
         kind: "district" as const,
         label: translateMapZoneLabel(zone.id, zone.label, language),
-        enabled: zone.enabled,
+        enabled: zone.enabled && (zone.id !== "labor-market" || hasRecruitmentCandidate(session)),
         gridArea: layout.gridArea,
         variant: layout.variant,
         zoneId: zone.id,
@@ -780,6 +786,7 @@ function createRecruitmentPanel(
   const candidate = previewRecruitmentCandidate(session);
   const marketSalary = Math.round(candidate.targetSalary * 0.96);
   const remainingSkips = Math.max(0, CANDIDATE_SKIP_LIMIT - (session.candidateSkipCount ?? 0));
+  const recruitmentAvailable = hasRecruitmentCandidate(session);
 
   return {
     role: translateRole(candidate.role, language),
@@ -821,13 +828,14 @@ function createRecruitmentPanel(
       minimumSalary: candidate.minimumSalary,
       equityPercent: candidate.equityPercent,
       actionId: "recruit-candidate",
+      enabled: recruitmentAvailable,
     },
     offerOptions: [
       {
         id: "next-candidate",
         label: formatNextCandidateLabel(remainingSkips, CANDIDATE_SKIP_LIMIT, language),
         actionId: "skip-candidate",
-        enabled: remainingSkips > 0,
+        enabled: recruitmentAvailable && remainingSkips > 0,
         remaining: remainingSkips,
       },
     ],

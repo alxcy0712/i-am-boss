@@ -805,6 +805,8 @@ function renderRecruitmentPanel(
           type="button"
           data-action-id="${recruitment.customOffer.actionId}"
           data-equity="${recruitment.customOffer.equityPercent}"
+          data-offer-available="${recruitment.customOffer.enabled ? "true" : "false"}"
+          ${recruitment.customOffer.enabled ? "" : "disabled"}
         >
           ${recruitment.customOffer.submitLabel}
         </button>
@@ -1147,7 +1149,8 @@ function updateCustomRecruitmentOfferState(source: Element): void {
     return;
   }
 
-  button.disabled = !isCustomRecruitmentOfferValid(input);
+  button.disabled =
+    button.dataset.offerAvailable !== "true" || !isCustomRecruitmentOfferValid(input);
 }
 
 function readEventCategoryFilter(value: string | undefined): WebEventCategoryFilter | undefined {

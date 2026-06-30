@@ -350,6 +350,31 @@ test("disables custom recruitment offers until the salary is valid", async ({ pa
   await expect(submitOffer).toBeEnabled();
 });
 
+test("disables recruitment after hiring the final available candidate", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("[data-language-id='en']").click();
+  await page.locator("[data-choice-id='network-founder']").click();
+  await page.locator("[data-open-dialog-id='recruitment']").click();
+
+  const nextCandidate = page.locator("[data-offer-id='next-candidate']");
+  for (let index = 0; index < 10; index += 1) {
+    await nextCandidate.click();
+  }
+
+  await expect(nextCandidate).toBeDisabled();
+  await expect(nextCandidate).toContainText("0/10");
+
+  const offerInput = page.locator("[data-offer-input]");
+  const submitOffer = page.locator("[data-offer-form] [data-action-id='recruit-candidate']");
+  await offerInput.fill("200000");
+  await expect(submitOffer).toBeEnabled();
+  await submitOffer.click();
+
+  await expect(submitOffer).toBeDisabled();
+  await page.locator("[data-close-dialog]").click();
+  await expect(page.locator("[data-zone-id='labor-market']")).toBeDisabled();
+});
+
 test("opens every operating panel from the control center and city map", async ({ page }) => {
   await page.goto("/");
   await page.locator("[data-language-id='en']").click();

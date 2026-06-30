@@ -136,6 +136,7 @@ describe("createWebScreenModel", () => {
             minimumSalary: number;
             equityPercent: number;
             actionId: string;
+            enabled: boolean;
           };
           offerOptions: Array<{
             id: string;
@@ -178,6 +179,7 @@ describe("createWebScreenModel", () => {
       recruitment?.customOffer.minimumSalary ?? 0,
     );
     expect(recruitment?.customOffer.actionId).toBe("recruit-candidate");
+    expect(recruitment?.customOffer.enabled).toBe(true);
     expect(recruitment?.offerOptions).toHaveLength(1);
     expect(recruitment?.offerOptions[0]).toMatchObject({
       id: "next-candidate",
@@ -211,6 +213,33 @@ describe("createWebScreenModel", () => {
       enabled: true,
       remaining: 10,
     });
+  });
+
+  it("disables recruitment offers after hiring the final available candidate", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 9 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+    session.state.company.reputation = 10;
+    session.state.company.culture = "adaptive";
+
+    for (let index = 0; index < 10; index += 1) {
+      session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    }
+
+    const finalHire = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    }).session;
+    const screen = createWebScreenModel(finalHire, { language: "en" });
+
+    expect(screen.recruitment?.customOffer.enabled).toBe(false);
+    expect(screen.recruitment?.offerOptions[0]).toMatchObject({
+      enabled: false,
+      remaining: 0,
+    });
+    expect(screen.mapTiles.find((tile) => tile.zoneId === "labor-market")?.enabled).toBe(false);
   });
 
   it("shows localized staff mix and payroll metrics after hiring", () => {

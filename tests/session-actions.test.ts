@@ -200,6 +200,47 @@ describe("session actions", () => {
     expect(hired.session.candidateCursor).toBe(beforeCursor + 1);
   });
 
+  it("exhausts recruitment after hiring the final available candidate", () => {
+    let session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
+    if (!session.state) {
+      throw new Error("Expected selected session to have state");
+    }
+    session.state.company.reputation = 10;
+    session.state.company.culture = "adaptive";
+    session.state.company.cash = 10_000_000;
+
+    for (let index = 0; index < 10; index += 1) {
+      session = performSessionAction(session, { id: "skip-candidate" } as never).session;
+    }
+
+    const finalHire = performSessionAction(session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    });
+
+    expect(finalHire.message).toContain("Hired");
+    expect(finalHire.session.candidateSkipCount).toBe(11);
+    expect(
+      getSessionActions(finalHire.session).find((action) => action.id === "recruit-candidate")
+        ?.enabled,
+    ).toBe(false);
+
+    const blocked = performSessionAction(finalHire.session, {
+      id: "recruit-candidate",
+      salary: 200_000,
+      equityPercent: 1,
+    });
+
+    expect(blocked.message).toBe("No candidates remaining");
+    expect(blocked.session.summary?.headcount).toBe(finalHire.session.summary?.headcount);
+
+    const advanced = performSessionAction(blocked.session, { id: "advance-30-days" }).session;
+    expect(
+      getSessionActions(advanced).find((action) => action.id === "recruit-candidate")?.enabled,
+    ).toBe(true);
+  });
+
   it("changes company culture through a city-map action", () => {
     const session = selectInitialChoice(createGameSession({ seed: 21 }), "network-founder");
     const result = performSessionAction(session, {
