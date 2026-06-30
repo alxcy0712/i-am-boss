@@ -7,6 +7,8 @@ import type {
   GameEvent,
   GameEventCategory,
   GameEventSeverity,
+  InsuranceType,
+  InvestmentType,
   MacroCyclePhase,
   ManagementLevel,
 } from "../sim/types";
@@ -102,6 +104,9 @@ interface LanguageText {
   financeRequirements: Record<string, string>;
   valuationSources: Record<"analyst-estimate" | "listed-market", string>;
   ipoStatuses: Record<"listed" | "ready" | "unmet", string>;
+  insuranceTypes: Record<InsuranceType, string>;
+  investmentTypes: Record<InvestmentType, string>;
+  governanceReasons: Record<string, string>;
   eventCategories: Record<GameEventCategory, string>;
   eventSeverities: Record<GameEventSeverity, string>;
   eventAllLabel: string;
@@ -315,6 +320,22 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       listed: "已上市公司",
       ready: "IPO 已就绪",
       unmet: "IPO 条件不足",
+    },
+    insuranceTypes: {
+      legal: "法律保险",
+      operational: "运营保险",
+      market: "市场保险",
+      comprehensive: "综合保险",
+    },
+    investmentTypes: {
+      stocks: "股票",
+      bonds: "债券",
+      real_estate: "房地产",
+      venture: "创投",
+      crypto: "加密资产",
+    },
+    governanceReasons: {
+      disclosure_overdue: "披露逾期",
     },
     eventCategories: {
       founder: "创始人",
@@ -561,6 +582,22 @@ const TEXT: Record<WebLanguage, LanguageText> = {
       listed: "Listed company",
       ready: "IPO ready",
       unmet: "IPO requirements unmet",
+    },
+    insuranceTypes: {
+      legal: "Legal Insurance",
+      operational: "Operational Insurance",
+      market: "Market Insurance",
+      comprehensive: "Comprehensive Insurance",
+    },
+    investmentTypes: {
+      stocks: "Stocks",
+      bonds: "Bonds",
+      real_estate: "Real Estate",
+      venture: "Venture",
+      crypto: "Crypto",
+    },
+    governanceReasons: {
+      disclosure_overdue: "Disclosure Overdue",
     },
     eventCategories: {
       founder: "FOUNDER",
@@ -905,19 +942,33 @@ export function translateEvent(event: GameEvent, language: WebLanguage): string 
     case "ai_hire_failed":
       return `AI 招聘失败：${translateRole(event.role, language)}`;
     case "insurance_purchased":
-      return `购买保险：${event.insuranceType}，保费 ${formatCurrency(event.premium)}`;
+      return `购买保险：${translateInsuranceType(
+        event.insuranceType,
+        language,
+      )}，保费 ${formatCurrency(event.premium)}`;
     case "insurance_claim_paid":
       return `保险理赔：赔付 ${formatCurrency(event.payout)}`;
     case "investment_made":
-      return `投资：${event.investmentType}，金额 ${formatCurrency(event.amount)}`;
+      return `投资：${translateInvestmentType(
+        event.investmentType,
+        language,
+      )}，金额 ${formatCurrency(event.amount)}`;
     case "investment_return":
       return `投资收益：${formatCurrency(event.returnAmount)}`;
     case "investment_sold":
-      return `投资出售：${formatCurrency(event.saleAmount)}，收益 ${formatCurrency(event.gain)}`;
+      return `投资出售：${translateInvestmentType(
+        event.investmentType,
+        language,
+      )}，金额 ${formatCurrency(event.saleAmount)}，收益 ${formatCurrency(event.gain)}`;
     case "governance_penalty":
-      return `治理处罚：${event.reason}，罚款 ${formatCurrency(event.penalty)}`;
+      return `治理处罚：${translateGovernanceReason(
+        event.reason,
+        language,
+      )}，罚款 ${formatCurrency(event.penalty)}`;
     case "delisting_warning":
-      return `退市警告：${event.reasons.join("，")}`;
+      return `退市警告：${event.reasons
+        .map((reason) => translateDelistingReason(reason, language))
+        .join("，")}`;
   }
 }
 
@@ -1021,6 +1072,24 @@ export function translateEventEntry(entry: string, language: WebLanguage): strin
     )}，市场情绪 ${special[3]}`;
   }
 
+  const insurance = entry.match(
+    /^Insurance purchased: ([\w-]+), premium ([\d,]+), coverage ([\d,]+)$/,
+  );
+  if (insurance) {
+    return `购买保险：${translateInsuranceTypeFromString(insurance[1], language)}，保费 ${formatCurrency(
+      Number(insurance[2].replaceAll(",", "")),
+    )}`;
+  }
+
+  const investment = entry.match(
+    /^Investment made: ([\w-]+) ¥([\d,]+), expected return (-?[\d.]+)%$/,
+  );
+  if (investment) {
+    return `投资：${translateInvestmentTypeFromString(investment[1], language)}，金额 ${formatCurrency(
+      Number(investment[2].replaceAll(",", "")),
+    )}`;
+  }
+
   return entry;
 }
 
@@ -1083,17 +1152,29 @@ function formatEnglishEvent(event: GameEvent): string {
     case "ai_hire_failed":
       return `AI hiring failed: ${event.role}`;
     case "insurance_purchased":
-      return `Insurance purchased: ${event.insuranceType}, premium ${formatCurrency(event.premium)}`;
+      return `Insurance purchased: ${translateInsuranceType(
+        event.insuranceType,
+        "en",
+      )}, premium ${formatCurrency(event.premium)}`;
     case "insurance_claim_paid":
       return `Insurance claim paid: ${formatCurrency(event.payout)}`;
     case "investment_made":
-      return `Investment made: ${event.investmentType}, ${formatCurrency(event.amount)}`;
+      return `Investment made: ${translateInvestmentType(
+        event.investmentType,
+        "en",
+      )}, ${formatCurrency(event.amount)}`;
     case "investment_return":
       return `Investment return: ${formatCurrency(event.returnAmount)}`;
     case "investment_sold":
-      return `Investment sold: ${formatCurrency(event.saleAmount)}, gain ${formatCurrency(event.gain)}`;
+      return `Investment sold: ${translateInvestmentType(
+        event.investmentType,
+        "en",
+      )}, ${formatCurrency(event.saleAmount)}, gain ${formatCurrency(event.gain)}`;
     case "governance_penalty":
-      return `Governance penalty: ${event.reason}, ${formatCurrency(event.penalty)}`;
+      return `Governance penalty: ${translateGovernanceReason(
+        event.reason,
+        "en",
+      )}, ${formatCurrency(event.penalty)}`;
     case "delisting_warning":
       return `Delisting warning: ${event.reasons.join(", ")}`;
   }
@@ -1109,6 +1190,49 @@ function translateCultureFromString(culture: string, language: WebLanguage): str
 
 function translateManagementLevelFromString(level: string, language: WebLanguage): string {
   return isManagementLevel(level) ? translateManagementLevel(level, language) : level;
+}
+
+function translateInsuranceType(type: InsuranceType, language: WebLanguage): string {
+  return TEXT[language].insuranceTypes[type];
+}
+
+function translateInvestmentType(type: InvestmentType, language: WebLanguage): string {
+  return TEXT[language].investmentTypes[type];
+}
+
+function translateInsuranceTypeFromString(type: string, language: WebLanguage): string {
+  return isInsuranceType(type) ? translateInsuranceType(type, language) : type;
+}
+
+function translateInvestmentTypeFromString(type: string, language: WebLanguage): string {
+  return isInvestmentType(type) ? translateInvestmentType(type, language) : type;
+}
+
+function translateGovernanceReason(reason: string, language: WebLanguage): string {
+  return TEXT[language].governanceReasons[reason] ?? reason;
+}
+
+function translateDelistingReason(reason: string, language: WebLanguage): string {
+  if (language === "en") {
+    return reason;
+  }
+
+  const cash = reason.match(/^Cash (-?\d+) below threshold (-?\d+)$/);
+  if (cash) {
+    return `现金 ${cash[1]} 低于门槛 ${cash[2]}`;
+  }
+
+  const reputation = reason.match(/^Reputation (-?[\d.]+) below threshold (-?[\d.]+)$/);
+  if (reputation) {
+    return `声誉 ${reputation[1]} 低于门槛 ${reputation[2]}`;
+  }
+
+  const valuation = reason.match(/^Valuation (-?\d+) below threshold (-?\d+)$/);
+  if (valuation) {
+    return `估值 ${valuation[1]} 低于门槛 ${valuation[2]}`;
+  }
+
+  return reason;
 }
 
 function translateEventType(type: string): string {
@@ -1156,6 +1280,22 @@ function isMacroCyclePhase(value: string): value is MacroCyclePhase {
 
 function isManagementLevel(value: string): value is ManagementLevel {
   return value === "individual" || value === "middle" || value === "executive";
+}
+
+function isInsuranceType(value: string): value is InsuranceType {
+  return (
+    value === "legal" || value === "operational" || value === "market" || value === "comprehensive"
+  );
+}
+
+function isInvestmentType(value: string): value is InvestmentType {
+  return (
+    value === "stocks" ||
+    value === "bonds" ||
+    value === "real_estate" ||
+    value === "venture" ||
+    value === "crypto"
+  );
 }
 
 function formatCurrency(value: number): string {

@@ -63,8 +63,8 @@ export function createGameViewModel(summary: HarnessSummary): GameViewModel {
     hud: {
       cash: { label: "Cash", value: formatCurrency(summary.cash) },
       valuation: { label: "Valuation", value: formatCurrency(summary.companyValuation) },
-      score: { label: "Score", value: Math.round(summary.score).toLocaleString("en-US") },
-      headcount: { label: "Headcount", value: String(summary.headcount) },
+      score: { label: "Score", value: formatInteger(summary.score) },
+      headcount: { label: "Headcount", value: formatInteger(summary.headcount) },
       culture: { label: "Culture", value: summary.companyCulture },
       morale: { label: "Morale", value: formatTenPointScore(summary.companyMorale) },
       reputation: {
@@ -89,9 +89,17 @@ export function createGameViewModel(summary: HarnessSummary): GameViewModel {
 }
 
 function formatCurrency(value: number): string {
-  return `¥${Math.round(value).toLocaleString("en-US")}`;
+  return `¥${Math.round(readFinite(value, 0)).toLocaleString("en-US")}`;
 }
 
 function formatTenPointScore(value: number): string {
-  return `${Number(value.toFixed(1)).toLocaleString("en-US")}/10`;
+  return `${Number(readFinite(value, 0).toFixed(1)).toLocaleString("en-US")}/10`;
+}
+
+function formatInteger(value: number): string {
+  return Math.round(readFinite(value, 0)).toLocaleString("en-US");
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
 }

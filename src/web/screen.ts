@@ -170,6 +170,7 @@ export interface WebRecruitmentCustomOffer {
   inputLabel: string;
   submitLabel: string;
   salary: number;
+  minimumSalary: number;
   equityPercent: number;
   actionId: "recruit-candidate";
 }
@@ -817,6 +818,7 @@ function createRecruitmentPanel(
       inputLabel: copy.offerAmount,
       submitLabel: copy.submitOffer,
       salary: marketSalary,
+      minimumSalary: candidate.minimumSalary,
       equityPercent: candidate.equityPercent,
       actionId: "recruit-candidate",
     },
@@ -920,8 +922,10 @@ function createFinancePanel(session: GameSession, language: WebLanguage): WebFin
   const financeConfig = PROBABILITY_CONFIG.finance;
   const valuationBasis = company.isPublic ? "listed-market" : "analyst-estimate";
   const runwayMonths = company.monthlyBurn > 0 ? company.cash / company.monthlyBurn : 0;
+  const loanResourceBonus =
+    Math.max(0, company.resources - 3) * financeConfig.resourceLoanBonusRate;
   const loanEligible =
-    company.reputation >= financeConfig.minimumLoanReputation &&
+    company.reputation + loanResourceBonus >= financeConfig.minimumLoanReputation &&
     company.annualRevenue > company.monthlyBurn * 6;
   const ipoRequirements: WebFinanceRequirement[] = [
     {
@@ -997,47 +1001,51 @@ function createGameOverScreen(
   reason: string,
   language: WebLanguage,
 ): WebGameOverScreen {
+  const daysPlayed = readFinite(summary.daysPlayed, 0);
+  const companyValuation = readFinite(summary.companyValuation, 0);
+  const playerWealth = readFinite(summary.playerWealth, 0);
+  const headcount = readFinite(summary.headcount, 0);
   const breakdown = calculateScoreBreakdown({
-    daysPlayed: summary.daysPlayed,
-    companyValuation: summary.companyValuation,
-    playerWealth: summary.playerWealth,
+    daysPlayed,
+    companyValuation,
+    playerWealth,
   });
 
   return {
     title: translateGameOverTitle(language),
     reasonLabel: translateGameOverSummaryLabel("reason", language),
     reasonValue: translateGameOverReasonLabel(reason, language),
-    finalScore: Math.round(summary.score).toLocaleString("en-US"),
+    finalScore: formatInteger(summary.score),
     scoreBreakdownTitle: translateGameOverSummaryLabel("scoreBreakdown", language),
     scoreRows: [
       {
         label: translateGameOverScoreBreakdownLabel("daysPlayed", language),
-        value: String(summary.daysPlayed),
+        value: formatInteger(daysPlayed),
         multiplier: "×1",
-        points: Math.round(breakdown.daysPoints).toLocaleString("en-US"),
+        points: formatInteger(breakdown.daysPoints),
       },
       {
         label: translateGameOverScoreBreakdownLabel("companyValuation", language),
-        value: formatCurrency(summary.companyValuation),
+        value: formatCurrency(companyValuation),
         multiplier: "×2",
-        points: Math.round(breakdown.valuationPoints).toLocaleString("en-US"),
+        points: formatInteger(breakdown.valuationPoints),
       },
       {
         label: translateGameOverScoreBreakdownLabel("playerWealth", language),
-        value: formatCurrency(summary.playerWealth),
+        value: formatCurrency(playerWealth),
         multiplier: "×1",
-        points: Math.round(breakdown.wealthPoints).toLocaleString("en-US"),
+        points: formatInteger(breakdown.wealthPoints),
       },
     ],
     summaryTitle: translateGameOverSummaryLabel("summary", language),
     summaryRows: [
       {
         label: translateGameOverSummaryLabel("daysSurvived", language),
-        value: String(summary.daysPlayed),
+        value: formatInteger(daysPlayed),
       },
       {
         label: translateGameOverSummaryLabel("finalHeadcount", language),
-        value: String(summary.headcount),
+        value: formatInteger(headcount),
       },
       {
         label: translateGameOverSummaryLabel("culture", language),
@@ -1083,28 +1091,38 @@ function createLeaderboardScreen(
 }
 
 function formatCurrency(value: number): string {
-  return `¥${Math.round(value).toLocaleString("en-US")}`;
+  return `¥${formatInteger(value)}`;
+}
+
+function formatInteger(value: number): string {
+  return Math.round(readFinite(value, 0)).toLocaleString("en-US");
+}
+
+function readFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function formatTenPoint(value: number): string {
-  return `${value}/10`;
+  return `${readFinite(value, 0)}/10`;
 }
 
 function formatMultiplier(value: number): string {
-  return `${value.toFixed(2)}x`;
+  return `${readFinite(value, 0).toFixed(2)}x`;
 }
 
 function formatTenureMonths(months: number, language: WebLanguage): string {
-  return language === "zh-CN" ? `${months}个月` : `${months}mo`;
+  const value = formatInteger(months);
+  return language === "zh-CN" ? `${value}个月` : `${value}mo`;
 }
 
 function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
+  return `${formatInteger(readFinite(value, 0) * 100)}%`;
 }
 
 function formatSignedOneDecimal(value: number): string {
-  const formatted = value.toFixed(1);
-  return value >= 0 ? `+${formatted}` : formatted;
+  const finiteValue = readFinite(value, 0);
+  const formatted = finiteValue.toFixed(1);
+  return finiteValue >= 0 ? `+${formatted}` : formatted;
 }
 
 function parseTenPoint(value: string): number {
